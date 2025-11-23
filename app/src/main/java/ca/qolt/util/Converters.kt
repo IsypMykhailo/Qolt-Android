@@ -14,4 +14,13 @@ class Converters {
     fun dateToTimestamp(date: Date?): Long? {
         return date?.time
     }
+
+    @TypeConverter
+    fun fromBlockedPackages(value: List<String>): String =
+        value.joinToString(separator = ",")
+
+    @TypeConverter
+    fun toBlockedPackages(value: String): List<String> =
+        if (value.isBlank()) emptyList()
+        else value.split(",")
 }

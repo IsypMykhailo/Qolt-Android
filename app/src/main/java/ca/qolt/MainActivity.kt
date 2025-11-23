@@ -53,6 +53,8 @@ class MainActivity : ComponentActivity() {
                             onSendReset = { /* TODO */ },
                             onLoginClick = { currentScreen = "login" }
                         )
+
+                        "presets" -> PresetsScreen()
                     }
                 }
             }
