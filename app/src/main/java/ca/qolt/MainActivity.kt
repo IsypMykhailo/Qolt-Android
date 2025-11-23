@@ -4,44 +4,58 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.animation.Crossfade
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import ca.qolt.ui.theme.QoltTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             QoltTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+
+                var currentScreen by remember { mutableStateOf("onboarding") }
+
+                Crossfade(targetState = currentScreen) { screen ->
+
+                    when (screen) {
+
+                        "onboarding" ->
+                            OnboardingPager(
+                                onFinished = { currentScreen = "qoltTag" }
+                            )
+
+                        "qoltTag" ->
+                            QoltTagScreen(
+                                onHaveTag = { currentScreen = "login" },
+                                onNoTag = { currentScreen = "login" }
+                            )
+
+                        "login" -> LoginScreen(
+                            onBack = { currentScreen = "qoltTag" },
+                            onCreateAccount = { currentScreen = "createAccount" },
+                            onForgotPassword = { currentScreen = "forgotPassword" },
+                            onLogin = { /* TODO */ }
+                        )
+
+                        "createAccount" -> CreateAccountScreen(
+                            onBack = { currentScreen = "login" },
+                            onContinue = { /* TODO */ }
+                        )
+
+                        "forgotPassword" -> ForgotPasswordScreen(
+                            onBack = { currentScreen = "login" },
+                            onSendReset = { /* TODO */ },
+                            onLoginClick = { currentScreen = "login" }
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    QoltTheme {
-        Greeting("Android")
     }
 }
