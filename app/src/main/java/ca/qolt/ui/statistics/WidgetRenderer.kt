@@ -3,13 +3,19 @@ package ca.qolt.ui.statistics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,11 +54,11 @@ fun WidgetRenderer(
         is WidgetType.WeeklyGoal -> {
             Card(
                 modifier = modifier
-                    .fillMaxWidth()
+                    .width(160.dp) // Smaller, more square (not full width)
                     .padding(8.dp),
-                shape = RoundedCornerShape(20.dp), // Large rounded corners for wider rectangle
+                shape = RoundedCornerShape(20.dp), // Large rounded corners
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF4F4F4) // Light grey background
+                    containerColor = StatisticsColors.CardBackground // Dark grey/black background
                 )
             ) {
                 WeeklyGoalWidget(type)
@@ -260,65 +266,121 @@ private fun WeeklyGoalWidget(type: WidgetType.WeeklyGoal) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp), // Generous padding
+            .padding(16.dp), // Reduced padding for smaller square card
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp) // Tighter spacing
     ) {
-        // Solid blue circular progress ring with target icon
+        // Dark circular base ring with four separate blue segments
         Box(
-            modifier = Modifier.size(100.dp), // Larger circle
+            modifier = Modifier.size(80.dp), // Smaller circle
             contentAlignment = Alignment.Center
         ) {
-            // Background ring (full circle, light blue)
+            // Dark base ring (full circle)
             CircularProgressIndicator(
-                progress = { 1f }, // Full circle for background
-                modifier = Modifier.size(100.dp),
-                color = Color(0xFF2196F3).copy(alpha = 0.2f), // Light blue background
-                strokeWidth = 10.dp
+                progress = { 1f }, // Full circle for dark base
+                modifier = Modifier.size(80.dp),
+                color = Color(0xFF2A2A2A), // Dark grey base ring
+                strokeWidth = 8.dp
             )
-            // Foreground progress arc (solid blue, no gaps)
-            CircularProgressIndicator(
-                progress = { type.percentage / 100f },
-                modifier = Modifier.size(100.dp),
-                color = Color(0xFF2196F3), // Solid blue
-                strokeWidth = 10.dp,
-                trackColor = Color.Transparent // No track, just the progress arc
-            )
-            // Target icon - using emoji for now, can be replaced with proper icon
+            
+            // Four separate blue segments using Canvas
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.size(80.dp)
+            ) {
+                val strokeWidth = 8.dp.toPx()
+                val radius = size.minDimension / 2 - strokeWidth / 2
+                val center = Offset(size.width / 2, size.height / 2)
+                
+                val segmentCount = 4
+                val segmentAngle = 60f // Each segment is 60 degrees
+                val gapAngle = 30f // Gap between segments is 30 degrees
+                val totalAngle = segmentAngle + gapAngle // 90 degrees per segment+gap
+                
+                val percentage = type.percentage / 100f
+                val filledSegments = (percentage * segmentCount).toInt()
+                val partialSegmentProgress = (percentage * segmentCount) - filledSegments
+                
+                for (i in 0 until segmentCount) {
+                    val startAngle = -90f + (i * totalAngle) // Start from top
+                    if (i < filledSegments) {
+                        // Fully filled segment
+                        drawArc(
+                            color = Color(0xFF2196F3), // Blue
+                            startAngle = startAngle,
+                            sweepAngle = segmentAngle,
+                            useCenter = false,
+                            topLeft = Offset(center.x - radius, center.y - radius),
+                            size = Size(radius * 2, radius * 2),
+                            style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        )
+                    } else if (i == filledSegments && partialSegmentProgress > 0f) {
+                        // Partially filled segment
+                        drawArc(
+                            color = Color(0xFF2196F3), // Blue
+                            startAngle = startAngle,
+                            sweepAngle = segmentAngle * partialSegmentProgress,
+                            useCenter = false,
+                            topLeft = Offset(center.x - radius, center.y - radius),
+                            size = Size(radius * 2, radius * 2),
+                            style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        )
+                    }
+                }
+            }
+            
+            // Concentric circles icon (simple blue circles on dark background)
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Outer circle
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(Color(0xFF2196F3).copy(alpha = 0.3f), CircleShape)
+                )
+                // Inner circle
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .background(Color(0xFF2196F3).copy(alpha = 0.5f), CircleShape)
+                )
+            }
+        }
+        
+        // Main value: 85 (bold, white, centered)
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.Bottom
+        ) {
             Text(
-                text = "🎯",
-                fontSize = 36.sp
+                text = "${type.percentage}",
+                style = MaterialTheme.typography.displayMedium.copy(
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White
+            )
+            // % symbol as separate small white label, positioned right below 85
+            Text(
+                text = "%",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Normal
+                ),
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 4.dp) // Aligned to baseline
             )
         }
         
-        // Main value: 85 (bold, dark grey, larger font)
-        Text(
-            text = "${type.percentage}",
-            style = MaterialTheme.typography.displayMedium.copy(
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = Color(0xFF282828) // Dark grey
-        )
-        
-        // Label: "Weekly Goal" (smaller, medium grey)
+        // Label: "Weekly Goal" (light grey, directly under 85)
         Text(
             text = "Weekly Goal",
             style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Normal
-            ),
-            color = Color(0xFF8A8A8A) // Medium grey
-        )
-        
-        // Progress: 5/7 (small, grey)
-        Text(
-            text = "${type.currentProgress}/${type.targetProgress}",
-            style = MaterialTheme.typography.bodySmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal
             ),
-            color = Color(0xFF8A8A8A) // Medium grey
+            color = Color(0xFFB0B0B0) // Light grey
         )
     }
 }
