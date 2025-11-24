@@ -15,7 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ca.qolt.ui.theme.QoltTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +64,8 @@ class MainActivity : ComponentActivity() {
                             onSendReset = { },
                             onLoginClick = { currentScreen = "login" }
                         )
+                        
+                        "statistics" -> ca.qolt.ui.statistics.StatisticsScreen()
 
                         "main" -> MainScreen(
                             onLogout = {

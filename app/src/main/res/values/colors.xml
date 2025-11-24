@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="focus_orange">#FF5214</color>
+    <color name="white_opacity_80">#CCFFFFFF</color>
+    <color name="streak_background">#0F0F11</color>
+    <color name="streak_accent_orange">#FF8534</color>
+    <color name="streak_ring_track">#2C2C2E</color>
+    <color name="white_opacity_60">#99FFFFFF</color>
 </resources>

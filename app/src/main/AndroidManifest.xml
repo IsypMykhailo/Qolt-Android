@@ -7,7 +7,8 @@
     <uses-permission android:name="android.permission.NFC" />
 
     <!-- Required for app usage statistics -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
     <!-- For notifications -->
@@ -68,6 +69,34 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Glance widget receiver -->
+        <receiver
+            android:name=".ui.statistics.FocusTimeWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/focus_time_widget_info" />
+        </receiver>
+
+        <!-- Streak widget receiver -->
+        <receiver
+            android:name=".ui.statistics.StreakWidgetReceiver"
+            android:exported="true"
+            android:label="Streak">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/streak_widget_info" />
+        </receiver>
 
         <!-- Blocked App Activity -->
         <activity
