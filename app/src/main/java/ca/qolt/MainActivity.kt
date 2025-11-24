@@ -1,6 +1,10 @@
 package ca.qolt
 
+import android.content.Intent
+import android.nfc.NfcAdapter
+import android.nfc.Tag
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -9,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import ca.qolt.ui.theme.QoltTheme
 
 class MainActivity : ComponentActivity() {
@@ -18,8 +23,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             QoltTheme {
-
-                var currentScreen by remember { mutableStateOf("onboarding") }
+                val context = LocalContext.current
+                val initialScreen = if (PreferencesManager.isLoggedIn(context)) "main" else "onboarding"
+                var currentScreen by remember { mutableStateOf(initialScreen) }
 
                 Crossfade(targetState = currentScreen) { screen ->
 
@@ -40,18 +46,28 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = "qoltTag" },
                             onCreateAccount = { currentScreen = "createAccount" },
                             onForgotPassword = { currentScreen = "forgotPassword" },
-                            onLogin = { /* TODO */ }
+                            onLogin = {
+                                PreferencesManager.setLoggedIn(context, true)
+                                currentScreen = "main"
+                            }
                         )
 
                         "createAccount" -> CreateAccountScreen(
                             onBack = { currentScreen = "login" },
-                            onContinue = { /* TODO */ }
+                            onContinue = { }
                         )
 
                         "forgotPassword" -> ForgotPasswordScreen(
                             onBack = { currentScreen = "login" },
-                            onSendReset = { /* TODO */ },
+                            onSendReset = { },
                             onLoginClick = { currentScreen = "login" }
+                        )
+
+                        "main" -> MainScreen(
+                            onLogout = {
+                                PreferencesManager.clearLoginState(context)
+                                currentScreen = "onboarding"
+                            }
                         )
 
                         "presets" -> PresetsScreen()
@@ -59,5 +75,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 }
