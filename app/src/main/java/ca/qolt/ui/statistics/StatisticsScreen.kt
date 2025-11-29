@@ -11,6 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -85,20 +88,40 @@ fun StatisticsScreen(
                 )
                 
                 // Right: Orange circular filter button
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(48.dp) // Increased from 40dp for chunkier feel
-                        .background(StatisticsColors.Orange, CircleShape)
-                        .clickable { viewModel.toggleFilterDialog() },
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.FilterList,
-                        contentDescription = "Filter",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp) // Slightly larger icon
-                    )
+                    // Test data button (debug only - remove in production)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(Color(0xFF4CAF50), CircleShape)
+                            .clickable { viewModel.generateTestData() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Generate Test Data",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp) // Increased from 40dp for chunkier feel
+                            .background(StatisticsColors.Orange, CircleShape)
+                            .clickable { viewModel.toggleFilterDialog() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.FilterList,
+                            contentDescription = "Filter",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp) // Slightly larger icon
+                        )
+                    }
                 }
             }
         }
@@ -112,9 +135,17 @@ fun StatisticsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
         
-        // Pre-compute filtered lists outside LazyColumn
-        val focusSessionsWidgets = widgets.filter { it.type is WidgetType.FocusSessions }
-        val statsTodayWidgets = widgets.filter { it.type is WidgetType.StatsToday }
+        // Helper function to check if a widget is narrow (should be placed side by side)
+        fun isNarrowWidget(widget: Widget): Boolean {
+            return widget.type is WidgetType.Streak || widget.type is WidgetType.WeeklyGoal
+        }
+        
+        // Display widgets in their actual order (sorted by position)
+        val widgetsToDisplay = if (widgets.isEmpty()) {
+            emptyList()
+        } else {
+            widgets.sortedBy { it.position }
+        }
         
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -129,12 +160,8 @@ fun StatisticsScreen(
                     )
                 }
                 
-                // Focus Sessions widgets
-                if (focusSessionsWidgets.isNotEmpty()) {
-                    items(focusSessionsWidgets.size) { index ->
-                        WidgetRenderer(widget = focusSessionsWidgets[index])
-                    }
-                } else if (widgets.isEmpty()) {
+                // Render widgets with smart grouping
+                if (widgetsToDisplay.isEmpty()) {
                     // Show loading or empty state
                     item {
                         Text(
@@ -144,29 +171,38 @@ fun StatisticsScreen(
                         )
                     }
                 } else {
-                    // Fallback: show all widgets if no focus sessions
-                    items(widgets.size) { index ->
-                        WidgetRenderer(widget = widgets[index])
-                    }
-                }
-                
-                // Stats Today Section
-                if (statsTodayWidgets.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    
-                    // Stats Today widgets in a row
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            statsTodayWidgets.forEach { widget ->
-                                Box(modifier = Modifier.weight(1f)) {
-                                    WidgetRenderer(widget = widget)
+                    // Group widgets: collect consecutive narrow widgets into rows
+                    var i = 0
+                    while (i < widgetsToDisplay.size) {
+                        val currentWidget = widgetsToDisplay[i]
+                        
+                        if (isNarrowWidget(currentWidget)) {
+                            // Collect consecutive narrow widgets
+                            val narrowWidgets = mutableListOf<Widget>()
+                            while (i < widgetsToDisplay.size && isNarrowWidget(widgetsToDisplay[i])) {
+                                narrowWidgets.add(widgetsToDisplay[i])
+                                i++
+                            }
+                            
+                            // Render narrow widgets in a row
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    narrowWidgets.forEach { widget ->
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            WidgetRenderer(widget = widget)
+                                        }
+                                    }
                                 }
                             }
+                        } else {
+                            // Render full-width widget
+                            item {
+                                WidgetRenderer(widget = currentWidget)
+                            }
+                            i++
                         }
                     }
                 }
@@ -195,10 +231,12 @@ fun StatisticsScreen(
         if (showCustomizeDialog) {
             CustomizeDialog(
                 widgets = widgets,
+                availableWidgetTypes = viewModel.getAllAvailableWidgetTypes(),
                 onDismiss = { viewModel.toggleCustomizeDialog() },
                 onMoveUp = { viewModel.moveWidgetUp(it) },
                 onMoveDown = { viewModel.moveWidgetDown(it) },
                 onRemove = { viewModel.removeWidget(it) },
+                onAdd = { viewModel.addWidget(it) },
                 onSave = { 
                     viewModel.savePreset()
                     viewModel.toggleCustomizeDialog()
@@ -375,38 +413,68 @@ private fun FilterDialog(
     onFiltersChange: (StatisticsFilters) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(
-                containerColor = StatisticsColors.CardBackground
-            )
+                .fillMaxHeight(0.8f),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            color = StatisticsColors.CardBackground
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Filter Options",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
-                )
-                
-                FilterControls(
-                    filters = filters,
-                    onTimePeriodChange = { onFiltersChange(filters.copy(timePeriod = it)) },
-                    onDurationChange = { onFiltersChange(filters.copy(duration = it)) },
-                    onDateChange = { onFiltersChange(filters.copy(selectedDate = it)) }
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Done", color = StatisticsColors.Orange)
+                    // Header
+                    Text(
+                        text = "Filter options",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 28.dp)
+                    )
+                    
+                    // Filter controls
+                    FilterControls(
+                        filters = filters,
+                        onTimePeriodChange = { onFiltersChange(filters.copy(timePeriod = it)) },
+                        onDurationChange = { onFiltersChange(filters.copy(duration = it)) },
+                        onDateChange = { onFiltersChange(filters.copy(selectedDate = it)) }
+                    )
+                }
+                
+                // Done button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp, top = 16.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(48.dp)
+                            .background(StatisticsColors.Orange, RoundedCornerShape(24.dp))
+                            .padding(horizontal = 40.dp, vertical = 12.dp)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Done",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color.Black
+                        )
                     }
                 }
             }
@@ -417,12 +485,18 @@ private fun FilterDialog(
 @Composable
 private fun CustomizeDialog(
     widgets: List<Widget>,
+    availableWidgetTypes: List<WidgetType>,
     onDismiss: () -> Unit,
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
     onRemove: (Int) -> Unit,
+    onAdd: (WidgetType) -> Unit,
     onSave: () -> Unit
 ) {
+    var showAddWidgets by remember { mutableStateOf(false) }
+    val currentWidgetIds = widgets.map { it.type.id }.toSet()
+    val availableToAdd = availableWidgetTypes.filter { it.id !in currentWidgetIds }
+    
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -437,57 +511,116 @@ private fun CustomizeDialog(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "Customize Widgets",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
-                )
-                
-                LazyColumn(
-                    modifier = Modifier.height(400.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    itemsIndexed(widgets) { index, widget ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = widget.type.title,
-                                color = Color.White,
-                                modifier = Modifier.weight(1f)
-                            )
-                            
-                            Row {
-                                IconButton(
-                                    onClick = { onMoveUp(index) },
-                                    enabled = index > 0
+                    Text(
+                        text = if (showAddWidgets) "Add Widgets" else "Customize Widgets",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                    if (!showAddWidgets && availableToAdd.isNotEmpty()) {
+                        TextButton(onClick = { showAddWidgets = true }) {
+                            Text("Add", color = StatisticsColors.Orange)
+                        }
+                    } else if (showAddWidgets) {
+                        TextButton(onClick = { showAddWidgets = false }) {
+                            Text("Back", color = StatisticsColors.Orange)
+                        }
+                    }
+                }
+                
+                if (showAddWidgets) {
+                    // Show available widgets to add
+                    LazyColumn(
+                        modifier = Modifier.height(400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (availableToAdd.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "All widgets are already added",
+                                    color = Color(0xFF9E9E9E),
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        } else {
+                            items(availableToAdd.size) { index ->
+                                val widgetType = availableToAdd[index]
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onAdd(widgetType) },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    Text(
+                                        text = widgetType.title,
+                                        color = Color.White,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                     Icon(
-                                        Icons.Default.ArrowUpward,
-                                        contentDescription = "Move up",
-                                        tint = if (index > 0) StatisticsColors.Orange else Color(0xFF424242)
+                                        Icons.Filled.Add,
+                                        contentDescription = "Add",
+                                        tint = StatisticsColors.Orange
                                     )
                                 }
+                            }
+                        }
+                    }
+                } else {
+                    // Show current widgets
+                    LazyColumn(
+                        modifier = Modifier.height(400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(
+                            items = widgets,
+                            key = { index, widget -> "${widget.type.id}_${widget.position}" }
+                        ) { index, widget ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = widget.type.title,
+                                    color = Color.White,
+                                    modifier = Modifier.weight(1f)
+                                )
                                 
-                                IconButton(
-                                    onClick = { onMoveDown(index) },
-                                    enabled = index < widgets.size - 1
-                                ) {
-                                    Icon(
-                                        Icons.Default.ArrowDownward,
-                                        contentDescription = "Move down",
-                                        tint = if (index < widgets.size - 1) StatisticsColors.Orange else Color(0xFF424242)
-                                    )
-                                }
-                                
-                                IconButton(onClick = { onRemove(index) }) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Remove",
-                                        tint = Color(0xFFFF5252)
-                                    )
+                                Row {
+                                    IconButton(
+                                        onClick = { onMoveUp(index) },
+                                        enabled = index > 0
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ArrowUpward,
+                                            contentDescription = "Move up",
+                                            tint = if (index > 0) StatisticsColors.Orange else Color(0xFF424242)
+                                        )
+                                    }
+                                    
+                                    IconButton(
+                                        onClick = { onMoveDown(index) },
+                                        enabled = index < widgets.size - 1
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ArrowDownward,
+                                            contentDescription = "Move down",
+                                            tint = if (index < widgets.size - 1) StatisticsColors.Orange else Color(0xFF424242)
+                                        )
+                                    }
+                                    
+                                    IconButton(onClick = { onRemove(index) }) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Remove",
+                                            tint = Color(0xFFFF5252)
+                                        )
+                                    }
                                 }
                             }
                         }
