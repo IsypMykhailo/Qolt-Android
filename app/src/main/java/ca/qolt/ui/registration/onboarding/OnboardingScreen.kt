@@ -1,4 +1,4 @@
-package ca.qolt
+package ca.qolt.ui.registration.onboarding
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

@@ -1,183 +1,67 @@
-package ca.qolt
+package ca.qolt.ui.home
 
-import android.content.Context
 import android.content.Intent
-import android.graphics.PixelFormat
-import android.view.Gravity
-import android.view.WindowManager
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
+import androidx.activity.compose.setContent
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Nfc
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.SavedStateRegistry
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import ca.qolt.ui.theme.QoltTheme
 import ca.qolt.ui.theme.SurfaceElevated
 import kotlinx.coroutines.delay
 
-private class OverlayLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner {
-    private val lifecycleRegistry = LifecycleRegistry(this)
-    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+class BlockedAppActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    override val lifecycle: Lifecycle get() = lifecycleRegistry
-    override val savedStateRegistry: SavedStateRegistry
-        get() = savedStateRegistryController.savedStateRegistry
-
-    fun onCreate() {
-        savedStateRegistryController.performRestore(null)
-        lifecycleRegistry.currentState = Lifecycle.State.CREATED
-    }
-
-    fun onResume() {
-        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
-    }
-
-    fun onDestroy() {
-        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
-    }
-}
-
-class BlockingOverlay(private val context: Context) {
-    private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var overlayView: ComposeView? = null
-    private var isShowing = false
-    private var lifecycleOwner: OverlayLifecycleOwner? = null
-
-    fun show(blockedPackage: String) {
-        if (isShowing) return
-
-        val appName = try {
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(blockedPackage, 0)
-            pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
-            blockedPackage
+        onBackPressedDispatcher.addCallback(this) {
+            goToHomeScreen()
         }
 
-        try {
-            overlayView = ComposeView(context).apply {
-                val owner = OverlayLifecycleOwner()
-                lifecycleOwner = owner
-                owner.onCreate()
-                owner.onResume()
+        val blockedPackage = intent.getStringExtra("BLOCKED_PACKAGE") ?: "Unknown App"
+        val appName = packageManager.getApplicationInfo(blockedPackage, 0)
+            .let { packageManager.getApplicationLabel(it).toString() }
 
-                setViewTreeLifecycleOwner(owner)
-                setViewTreeSavedStateRegistryOwner(owner)
-
-                setContent {
-                    QoltTheme {
-                        BlockingOverlayContent(
-                            appName = appName,
-                            onGoBack = {
-                                dismiss()
-                                val homeIntent = Intent(Intent.ACTION_MAIN)
-                                homeIntent.addCategory(Intent.CATEGORY_HOME)
-                                homeIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                context.startActivity(homeIntent)
-                            }
-                        )
-                    }
-                }
+        setContent {
+            QoltTheme {
+                BlockedAppScreen(
+                    appName = appName,
+                    onGoBack = { goToHomeScreen() }
+                )
             }
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT
-            )
-
-            params.gravity = Gravity.TOP or Gravity.START
-            params.x = 0
-            params.y = 0
-
-            windowManager.addView(overlayView, params)
-            isShowing = true
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-            isShowing = false
         }
     }
 
-    fun dismiss() {
-        if (!isShowing || overlayView == null) return
-
-        try {
-            lifecycleOwner?.onDestroy()
-            lifecycleOwner = null
-
-            windowManager.removeView(overlayView)
-            overlayView = null
-            isShowing = false
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    private fun goToHomeScreen() {
+        val homeIntent = Intent(Intent.ACTION_MAIN)
+        homeIntent.addCategory(Intent.CATEGORY_HOME)
+        homeIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(homeIntent)
     }
+
+
 }
 
 @Composable
-private fun BlockingOverlayContent(
+private fun BlockedAppScreen(
     appName: String,
     onGoBack: () -> Unit
 ) {
@@ -226,8 +110,7 @@ private fun BlockingOverlayContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.systemBars),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -309,6 +192,7 @@ private fun BlockingOverlayContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Unlock instructions
                 Surface(
                     color = SurfaceElevated,
                     shape = RoundedCornerShape(16.dp),

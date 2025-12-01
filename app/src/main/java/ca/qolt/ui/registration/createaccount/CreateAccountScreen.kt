@@ -1,4 +1,4 @@
-package ca.qolt
+package ca.qolt.ui.registration.createaccount
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,8 +18,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.app.DatePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
+import ca.qolt.R
 import java.util.Calendar
+
+@Composable
+fun CreateAccount(modifier: Modifier = Modifier, viewModel: CreateAccountViewModel) {
+    BackHandler { viewModel.navigator.navigateBack() }
+    CreateAccountScreen(
+        onBack = viewModel::onBack,
+        onContinue = { /* Handle continue action */ }
+    )
+}
 
 @Composable
 fun CreateAccountScreen(

@@ -1,7 +1,7 @@
 package ca.qolt.data.repository
 
 import android.content.Context
-import ca.qolt.AppBlockingManager
+import ca.qolt.services.AppBlockingManager
 import ca.qolt.data.local.SessionManager
 import ca.qolt.data.local.dao.UsageSessionDao
 import ca.qolt.data.local.entity.UsageSessionEntity

@@ -19,7 +19,7 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     companion object {
-        private const val TAG = "HomeViewModel"
+        const val TAG = "HomeViewModel"
     }
 
     private val _currentStreak = MutableStateFlow(0)

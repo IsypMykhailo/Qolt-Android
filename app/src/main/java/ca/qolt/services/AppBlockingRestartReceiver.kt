@@ -1,4 +1,4 @@
-package ca.qolt
+package ca.qolt.services
 
 import android.content.BroadcastReceiver
 import android.content.Context

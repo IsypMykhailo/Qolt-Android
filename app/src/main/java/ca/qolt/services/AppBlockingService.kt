@@ -1,11 +1,15 @@
-package ca.qolt
+package ca.qolt.services
 
 import android.app.*
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import ca.qolt.ui.home.BlockingOverlay
+import ca.qolt.ui.MainActivity
+import ca.qolt.R
 import ca.qolt.data.local.SessionManager
 import ca.qolt.data.repository.UsageSessionRepository
 import dagger.hilt.android.AndroidEntryPoint
@@ -116,12 +120,12 @@ class AppBlockingService : Service() {
             val currentTime = System.currentTimeMillis()
 
             val events = usageStatsManager.queryEvents(currentTime - 1000, currentTime)
-            val currentEvent = android.app.usage.UsageEvents.Event()
+            val currentEvent = UsageEvents.Event()
             var foregroundPackage = ""
 
             while (events.hasNextEvent()) {
                 events.getNextEvent(currentEvent)
-                if (currentEvent.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                if (currentEvent.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                     foregroundPackage = currentEvent.packageName
                 }
             }

@@ -1,12 +1,20 @@
-package ca.qolt
+package ca.qolt.ui.registration.onboarding
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import ca.qolt.R
 import kotlinx.coroutines.launch
+
+@Composable
+fun Onboarding(modifier: Modifier = Modifier, viewModel: OnboardingViewModel) {
+    BackHandler { viewModel.navigator.finish() }
+    OnboardingPager(viewModel::onFinished)
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

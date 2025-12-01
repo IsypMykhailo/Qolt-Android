@@ -24,10 +24,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import ca.qolt.ui.statistics.StatisticsColors
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatisticsScreen(
-    viewModel: StatisticsViewModel = hiltViewModel()
+fun Statistics(
+    modifier: Modifier = Modifier,
+    viewModel: StatisticsViewModel
 ) {
     val widgets by viewModel.widgets.collectAsState()
     val isEditMode by viewModel.isEditMode.collectAsState()
@@ -35,9 +35,50 @@ fun StatisticsScreen(
     val showFilterDialog by viewModel.showFilterDialog.collectAsState()
     val showSearchDialog by viewModel.showSearchDialog.collectAsState()
     val showCustomizeDialog by viewModel.showCustomizeDialog.collectAsState()
-    
+    StatisticsScreen(
+        modifier = modifier,
+        widgets,
+        isEditMode,
+        filters,
+        showFilterDialog,
+        showSearchDialog,
+        showCustomizeDialog,
+        viewModel::toggleSearchDialog,
+        viewModel::toggleFilterDialog,
+        viewModel::toggleCustomizeDialog,
+        viewModel::setDuration,
+        viewModel::setSearchQuery,
+        viewModel::updateFilters,
+        viewModel::moveWidgetUp,
+        viewModel::moveWidgetDown,
+        viewModel::removeWidget,
+        viewModel::savePreset
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatisticsScreen(
+    modifier: Modifier = Modifier,
+    widgets: List<Widget>,
+    isEditMode: Boolean,
+    filters: StatisticsFilters,
+    showFilterDialog: Boolean,
+    showSearchDialog: Boolean,
+    showCustomizeDialog: Boolean,
+    toggleSearchDialog: () -> Unit,
+    toggleFilterDialog: () -> Unit,
+    toggleCustomizeDialog: () -> Unit,
+    setDuration: (Duration) -> Unit,
+    setSearchQuery: (String) -> Unit,
+    updateFilters: (StatisticsFilters) -> Unit,
+    moveWidgetUp: (Int) -> Unit,
+    moveWidgetDown: (Int) -> Unit,
+    removeWidget: (Int) -> Unit,
+    savePreset: () -> Unit
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(StatisticsColors.DarkBackground)
     ) {
@@ -64,7 +105,7 @@ fun StatisticsScreen(
                         .align(Alignment.CenterStart)
                         .size(48.dp) // Increased from 40dp for chunkier feel
                         .background(Color.White, CircleShape)
-                        .clickable { viewModel.toggleSearchDialog() },
+                        .clickable { toggleSearchDialog() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -90,7 +131,7 @@ fun StatisticsScreen(
                         .align(Alignment.CenterEnd)
                         .size(48.dp) // Increased from 40dp for chunkier feel
                         .background(StatisticsColors.Orange, CircleShape)
-                        .clickable { viewModel.toggleFilterDialog() },
+                        .clickable { toggleFilterDialog() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -106,7 +147,7 @@ fun StatisticsScreen(
         // Duration Selector (1 Day, 7 Days, 30 Days) - matching screenshot
         DurationSelectorCompact(
             selectedDuration = filters.duration,
-            onDurationSelected = { viewModel.setDuration(it) },
+            onDurationSelected = { setDuration(it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -125,7 +166,7 @@ fun StatisticsScreen(
                 item {
                     SectionHeader(
                         title = "STREAKS",
-                        onMoreClick = { viewModel.toggleCustomizeDialog() }
+                        onMoreClick = { toggleCustomizeDialog() }
                     )
                 }
                 
@@ -177,8 +218,8 @@ fun StatisticsScreen(
         if (showSearchDialog) {
             SearchDialog(
                 searchQuery = filters.searchQuery,
-                onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                onDismiss = { viewModel.toggleSearchDialog() }
+                onSearchQueryChange = { setSearchQuery(it) },
+                onDismiss = { toggleSearchDialog() }
             )
         }
         
@@ -186,8 +227,8 @@ fun StatisticsScreen(
         if (showFilterDialog) {
             FilterDialog(
                 filters = filters,
-                onDismiss = { viewModel.toggleFilterDialog() },
-                onFiltersChange = { viewModel.updateFilters(it) }
+                onDismiss = { toggleFilterDialog() },
+                onFiltersChange = { updateFilters(it) }
             )
         }
         
@@ -195,13 +236,13 @@ fun StatisticsScreen(
         if (showCustomizeDialog) {
             CustomizeDialog(
                 widgets = widgets,
-                onDismiss = { viewModel.toggleCustomizeDialog() },
-                onMoveUp = { viewModel.moveWidgetUp(it) },
-                onMoveDown = { viewModel.moveWidgetDown(it) },
-                onRemove = { viewModel.removeWidget(it) },
+                onDismiss = { toggleCustomizeDialog() },
+                onMoveUp = { moveWidgetUp(it) },
+                onMoveDown = { moveWidgetDown(it) },
+                onRemove = { removeWidget(it) },
                 onSave = { 
-                    viewModel.savePreset()
-                    viewModel.toggleCustomizeDialog()
+                    savePreset()
+                    toggleCustomizeDialog()
                 }
             )
         }

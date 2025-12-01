@@ -59,7 +59,7 @@
         android:theme="@style/Theme.Qolt">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Qolt"
@@ -112,7 +112,7 @@
 
         <!-- Blocked App Activity -->
         <activity
-            android:name=".BlockedAppActivity"
+            android:name=".ui.home.BlockedAppActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
@@ -122,7 +122,7 @@
 
         <!-- App Blocking Service -->
         <service
-            android:name=".AppBlockingService"
+            android:name=".services.AppBlockingService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
@@ -133,7 +133,7 @@
 
         <!-- Boot and Update Receiver for App Blocking Service -->
         <receiver
-            android:name=".AppBlockingRestartReceiver"
+            android:name=".services.AppBlockingRestartReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>

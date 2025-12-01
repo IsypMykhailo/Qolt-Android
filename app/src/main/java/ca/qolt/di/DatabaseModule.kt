@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import ca.qolt.data.local.QoltDatabase
 import ca.qolt.data.local.dao.BlockedAppDao
+import ca.qolt.data.local.dao.PresetDao
 import ca.qolt.data.local.dao.UsageSessionDao
 import dagger.Module
 import dagger.Provides
@@ -40,5 +41,11 @@ object DatabaseModule {
     @Singleton
     fun provideUsageSessionDao(database: QoltDatabase): UsageSessionDao {
         return database.usageSessionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePresetDao(database: QoltDatabase): PresetDao {
+        return database.presetDao()
     }
 }

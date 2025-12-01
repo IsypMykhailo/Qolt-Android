@@ -1,5 +1,6 @@
-package ca.qolt
+package ca.qolt.ui.registration.qolttag
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ca.qolt.R
+
+@Composable
+fun QoltTag(modifier: Modifier = Modifier, viewModel: QoltTagViewModel) {
+    BackHandler { viewModel.navigator.finish() }
+    QoltTagScreen(viewModel::onHaveTag, viewModel::onNoTag)
+}
 
 @Composable
 fun QoltTagScreen(

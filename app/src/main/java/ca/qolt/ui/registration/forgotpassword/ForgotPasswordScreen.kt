@@ -1,5 +1,6 @@
-package ca.qolt
+package ca.qolt.ui.registration.forgotpassword
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ca.qolt.R
+
+@Composable
+fun ForgotPassword(modifier: Modifier = Modifier, viewModel: ForgotPasswordViewModel) {
+    BackHandler { viewModel.navigator.navigateBack() }
+    ForgotPasswordScreen(
+        onBack = viewModel::onBack,
+        onSendReset = {},
+        onLoginClick = viewModel::onLoginClick
+    )
+}
 
 @Composable
 fun ForgotPasswordScreen(

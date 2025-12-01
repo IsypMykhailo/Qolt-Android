@@ -1,4 +1,4 @@
-package ca.qolt
+package ca.qolt.util
 
 import android.content.Context
 import android.content.SharedPreferences

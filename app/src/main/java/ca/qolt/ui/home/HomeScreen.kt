@@ -1,5 +1,6 @@
-package ca.qolt
+package ca.qolt.ui.home
 
+import android.Manifest
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.Context
@@ -17,6 +18,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -96,9 +98,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import ca.qolt.model.InstalledApp
@@ -111,6 +115,13 @@ import kotlinx.coroutines.launch
 import java.nio.charset.Charset
 import kotlin.math.min
 import androidx.core.content.edit
+import ca.qolt.services.AppBlockingManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 
 private fun loadInstalledApps(context: Context): List<InstalledApp> {
@@ -121,7 +132,7 @@ private fun loadInstalledApps(context: Context): List<InstalledApp> {
         .filter { appInfo ->
             // Exclude Qolt app itself and only include apps with launch intent
             pm.getLaunchIntentForPackage(appInfo.packageName) != null &&
-            appInfo.packageName != ownPackageName
+                    appInfo.packageName != ownPackageName
         }
         .map { appInfo ->
             InstalledApp(
@@ -183,15 +194,19 @@ private fun parseNdefRecord(record: NdefRecord): String? {
         record.tnf == NdefRecord.TNF_WELL_KNOWN && record.type.contentEquals(NdefRecord.RTD_TEXT) -> {
             parseTextRecord(record)
         }
+
         record.tnf == NdefRecord.TNF_WELL_KNOWN && record.type.contentEquals(NdefRecord.RTD_URI) -> {
             parseUriRecord(record)
         }
+
         record.tnf == NdefRecord.TNF_ABSOLUTE_URI -> {
             String(record.type, Charset.forName("UTF-8"))
         }
+
         record.tnf == NdefRecord.TNF_MIME_MEDIA -> {
             String(record.payload, Charset.forName("UTF-8"))
         }
+
         else -> null
     }
 }
@@ -239,8 +254,9 @@ private fun parseUriRecord(record: NdefRecord): String? {
 }
 
 @Composable
-fun HomeScreen(
-    viewModel: ca.qolt.ui.home.HomeViewModel = hiltViewModel()
+fun Home(
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -248,10 +264,12 @@ fun HomeScreen(
 
     val vibrator = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            val vibratorManager =
+                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
             vibratorManager?.defaultVibrator
         } else {
-            androidx.core.content.ContextCompat.getSystemService(context, Vibrator::class.java)        }
+            ContextCompat.getSystemService(context, Vibrator::class.java)
+        }
     }
 
     var isNfcReading by remember { mutableStateOf(false) }
@@ -259,8 +277,8 @@ fun HomeScreen(
 
     val prefs = remember { context.getSharedPreferences("qolt_prefs", Context.MODE_PRIVATE) }
     val lastEmergencyDate = prefs.getString("last_emergency_date", "") ?: ""
-    val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-        .format(java.util.Date())
+    val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        .format(Date())
     var emergencyUsedToday by remember {
         mutableStateOf(lastEmergencyDate == currentDate)
     }
@@ -334,7 +352,10 @@ fun HomeScreen(
                             viewModel.refreshStreak()
 
                             vibrator?.vibrate(
-                                VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE)
+                                VibrationEffect.createOneShot(
+                                    200,
+                                    VibrationEffect.DEFAULT_AMPLITUDE
+                                )
                             )
 
                             Toast.makeText(
@@ -370,7 +391,8 @@ fun HomeScreen(
 
                     if (action == NfcAdapter.ACTION_TAG_DISCOVERED ||
                         action == NfcAdapter.ACTION_NDEF_DISCOVERED ||
-                        action == NfcAdapter.ACTION_TECH_DISCOVERED) {
+                        action == NfcAdapter.ACTION_TECH_DISCOVERED
+                    ) {
 
                         val tag: Tag? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
@@ -381,7 +403,11 @@ fun HomeScreen(
                         if (tag != null) {
                             val textContent = readNdefMessage(tag)
 
-                            if (textContent != null && textContent.contains("KillSwitch", ignoreCase = true)) {
+                            if (textContent != null && textContent.contains(
+                                    "KillSwitch",
+                                    ignoreCase = true
+                                )
+                            ) {
                                 showScanSuccess = true
                                 showScanningDialog = false
                                 isNfcReading = false
@@ -395,17 +421,18 @@ fun HomeScreen(
                                                 Toast.LENGTH_LONG
                                             ).show()
                                             AppBlockingManager.requestUsageStatsPermission(context)
-                                        }
-                                        else if (!AppBlockingManager.hasOverlayPermission(context)) {
+                                        } else if (!AppBlockingManager.hasOverlayPermission(context)) {
                                             Toast.makeText(
                                                 context,
                                                 "Please grant Display Over Other Apps permission",
                                                 Toast.LENGTH_LONG
                                             ).show()
                                             AppBlockingManager.requestOverlayPermission(context)
-                                        }
-                                        else {
-                                            AppBlockingManager.saveBlockedApps(context, selectedApps)
+                                        } else {
+                                            AppBlockingManager.saveBlockedApps(
+                                                context,
+                                                selectedApps
+                                            )
                                             AppBlockingManager.blockApps(context, selectedApps)
                                             appsBlocked = true
 
@@ -493,7 +520,8 @@ fun HomeScreen(
             try {
                 nfcAdapter.enableForegroundDispatch(activity, pendingIntent, intentFilters, null)
             } catch (e: Exception) {
-                Toast.makeText(context, "Error activating NFC: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Error activating NFC: ${e.message}", Toast.LENGTH_LONG)
+                    .show()
             }
         } else if (!isNfcReading && activity != null && nfcAdapter != null) {
             try {
@@ -563,454 +591,456 @@ fun HomeScreen(
         label = "emergencyRotation"
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.systemBars)
+    Column(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = topBarOffset)
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .offset(y = topBarOffset)
-                    .padding(horizontal = 24.dp, vertical = 32.dp)
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Streak Badge
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(20.dp),
+                tonalElevation = 2.dp
             ) {
-                // Streak Badge
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(20.dp),
-                    tonalElevation = 2.dp
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = "Streak",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "$currentStreak",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.LocalFireDepartment,
+                        contentDescription = "Streak",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "$currentStreak",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
+            }
 
-                if (appsBlocked) {
-                    Surface(
-                        color = if (emergencyUsedToday)
-                            MaterialTheme.colorScheme.surfaceVariant
-                        else
-                            MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(20.dp),
-                        tonalElevation = if (emergencyUsedToday) 0.dp else 2.dp,
-                        modifier = Modifier
-                            .rotate(emergencyRotation)
-                            .clickable(enabled = !emergencyUsedToday) @androidx.annotation.RequiresPermission(
-                                android.Manifest.permission.VIBRATE
-                            ) {
-                                if (!emergencyUsedToday) {
-                                    scope.launch @androidx.annotation.RequiresPermission(android.Manifest.permission.VIBRATE) {
-                                        viewModel.endSession()
+            if (appsBlocked) {
+                Surface(
+                    color = if (emergencyUsedToday)
+                        MaterialTheme.colorScheme.surfaceVariant
+                    else
+                        MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(20.dp),
+                    tonalElevation = if (emergencyUsedToday) 0.dp else 2.dp,
+                    modifier = Modifier
+                        .rotate(emergencyRotation)
+                        .clickable(enabled = !emergencyUsedToday) @RequiresPermission(
+                            Manifest.permission.VIBRATE
+                        ) {
+                            if (!emergencyUsedToday) {
+                                scope.launch @RequiresPermission(Manifest.permission.VIBRATE) {
+                                    viewModel.endSession()
 
-                                        AppBlockingManager.unblockApps(context)
-                                        appsBlocked = false
-                                        emergencyUsedToday = true
+                                    AppBlockingManager.unblockApps(context)
+                                    appsBlocked = false
+                                    emergencyUsedToday = true
 
-                                        prefs.edit {
-                                            putString("last_emergency_date", currentDate)
-                                        }
-
-                                        vibrator?.vibrate(
-                                            VibrationEffect.createWaveform(
-                                                longArrayOf(0, 100, 50, 100),
-                                                -1
-                                            )
-                                        )
-
-                                        Toast.makeText(
-                                            context,
-                                            "Emergency unlock activated! Available again tomorrow.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
+                                    prefs.edit {
+                                        putString("last_emergency_date", currentDate)
                                     }
-                                } else {
-                                    emergencyShake = true
 
-                                    // Error haptic
                                     vibrator?.vibrate(
-                                        VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
+                                        VibrationEffect.createWaveform(
+                                            longArrayOf(0, 100, 50, 100),
+                                            -1
+                                        )
                                     )
 
                                     Toast.makeText(
                                         context,
-                                        "Emergency unlock already used today",
-                                        Toast.LENGTH_SHORT
+                                        "Emergency unlock activated! Available again tomorrow.",
+                                        Toast.LENGTH_LONG
                                     ).show()
                                 }
-                            }
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Warning,
-                                contentDescription = "Emergency Unblock",
-                                tint = if (emergencyUsedToday)
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                else
-                                    MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
-            }
+                            } else {
+                                emergencyShake = true
 
-            // Center - Main FAB
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .scale(fabScale)
-                        .size(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Enhanced progress rings
-                    if (holdProgress > 0f) {
-                        // Pulsing outer ring animation
-                        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                        val pulseScale by infiniteTransition.animateFloat(
-                            initialValue = 1f,
-                            targetValue = 1.15f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(800, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "pulseScale"
-                        )
-
-                        val pulseAlpha by infiniteTransition.animateFloat(
-                            initialValue = 0.4f,
-                            targetValue = 0.1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(800, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "pulseAlpha"
-                        )
-
-                        androidx.compose.foundation.Canvas(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            val centerX = size.width / 2
-                            val centerY = size.height / 2
-                            val baseRadius = size.minDimension / 2
-
-                            // Outer pulsing ring
-                            drawCircle(
-                                color = Orange.copy(alpha = pulseAlpha),
-                                radius = baseRadius * pulseScale,
-                                center = Offset(centerX, centerY),
-                                style = Stroke(width = 3.dp.toPx())
-                            )
-
-                            // Background track (subtle)
-                            val trackStrokeWidth = 4.dp.toPx()
-                            val trackRadius = baseRadius - 12.dp.toPx()
-                            drawArc(
-                                color = Orange.copy(alpha = 0.15f),
-                                startAngle = -90f,
-                                sweepAngle = 360f,
-                                useCenter = false,
-                                topLeft = Offset(
-                                    centerX - trackRadius,
-                                    centerY - trackRadius
-                                ),
-                                size = Size(trackRadius * 2, trackRadius * 2),
-                                style = Stroke(
-                                    width = trackStrokeWidth,
-                                    cap = StrokeCap.Round
-                                )
-                            )
-
-                            // Main progress arc with gradient-like effect (multiple layers)
-                            val mainStrokeWidth = 8.dp.toPx()
-                            val mainRadius = baseRadius - 12.dp.toPx()
-
-                            // Glow layer (slightly larger, more transparent)
-                            drawArc(
-                                color = Orange.copy(alpha = 0.3f),
-                                startAngle = -90f,
-                                sweepAngle = 360f * holdProgress,
-                                useCenter = false,
-                                topLeft = Offset(
-                                    centerX - mainRadius - 2.dp.toPx(),
-                                    centerY - mainRadius - 2.dp.toPx()
-                                ),
-                                size = Size((mainRadius + 2.dp.toPx()) * 2, (mainRadius + 2.dp.toPx()) * 2),
-                                style = Stroke(
-                                    width = mainStrokeWidth + 4.dp.toPx(),
-                                    cap = StrokeCap.Round
-                                )
-                            )
-
-                            // Main solid arc
-                            drawArc(
-                                color = Orange,
-                                startAngle = -90f,
-                                sweepAngle = 360f * holdProgress,
-                                useCenter = false,
-                                topLeft = Offset(
-                                    centerX - mainRadius,
-                                    centerY - mainRadius
-                                ),
-                                size = Size(mainRadius * 2, mainRadius * 2),
-                                style = Stroke(
-                                    width = mainStrokeWidth,
-                                    cap = StrokeCap.Round
-                                )
-                            )
-
-                            // Leading edge glow dot
-                            if (holdProgress > 0.05f) {
-                                val angle = (-90f + 360f * holdProgress) * (kotlin.math.PI / 180f)
-                                val dotX = centerX + mainRadius * kotlin.math.cos(angle).toFloat()
-                                val dotY = centerY + mainRadius * kotlin.math.sin(angle).toFloat()
-
-                                // Outer glow
-                                drawCircle(
-                                    color = Orange.copy(alpha = 0.3f),
-                                    radius = 12.dp.toPx(),
-                                    center = Offset(dotX, dotY)
+                                // Error haptic
+                                vibrator?.vibrate(
+                                    VibrationEffect.createOneShot(
+                                        50,
+                                        VibrationEffect.DEFAULT_AMPLITUDE
+                                    )
                                 )
 
-                                // Inner bright dot
-                                drawCircle(
-                                    color = Orange,
-                                    radius = 6.dp.toPx(),
-                                    center = Offset(dotX, dotY)
-                                )
-
-                                // Center highlight
-                                drawCircle(
-                                    color = Color.White,
-                                    radius = 3.dp.toPx(),
-                                    center = Offset(dotX, dotY)
-                                )
+                                Toast.makeText(
+                                    context,
+                                    "Emergency unlock already used today",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
-                    }
-
-                    // Main FAB
-                    val icon: ImageVector = when {
-                        showScanSuccess -> Icons.Default.Check
-                        appsBlocked -> Icons.Default.Lock
-                        else -> Icons.Default.LockOpen
-                    }
-
-                    val iconRotation by animateFloatAsState(
-                        targetValue = if (showScanSuccess) 360f else 0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "iconRotation"
-                    )
-
-                    Surface(
-                        modifier = Modifier
-                            .size(180.dp)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onTap = {
-                                        // Short tap - show NFC dialog
-                                        if (!showScanSuccess && !showScanningDialog) {
-                                            if (nfcAdapter == null) {
-                                                Toast
-                                                    .makeText(
-                                                        context,
-                                                        "NFC not available on this device",
-                                                        Toast.LENGTH_LONG
-                                                    )
-                                                    .show()
-                                            } else if (!nfcAdapter.isEnabled) {
-                                                Toast
-                                                    .makeText(
-                                                        context,
-                                                        "Please enable NFC in Settings",
-                                                        Toast.LENGTH_LONG
-                                                    )
-                                                    .show()
-                                            } else {
-                                                showScanningDialog = true
-                                                isNfcReading = true
-                                            }
-                                        }
-                                    },
-                                    onPress = @androidx.annotation.RequiresPermission(android.Manifest.permission.VIBRATE) {
-                                        // Long press - hold to block
-                                        if (!appsBlocked && !showScanSuccess && !showScanningDialog) {
-                                            isHolding = true
-
-                                            // Start haptic
-                                            vibrator?.vibrate(
-                                                VibrationEffect.createOneShot(
-                                                    50,
-                                                    VibrationEffect.DEFAULT_AMPLITUDE
-                                                )
-                                            )
-                                        }
-
-                                        tryAwaitRelease()
-                                        isHolding = false
-                                    }
-                                )
-                            },
-                        shape = CircleShape,
-                        color = fabColor,
-                        shadowElevation = 8.dp,
-                        tonalElevation = 8.dp
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = if (appsBlocked) "Unlock apps" else "Lock apps",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .rotate(iconRotation)
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (appsBlocked &&
-                !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) {
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                    ),
-                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.BatteryAlert,
-                            contentDescription = "Battery optimization warning",
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.size(32.dp)
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "Emergency Unblock",
+                            tint = if (emergencyUsedToday)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            else
+                                MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Improve Reliability",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                    }
+                }
+            }
+        }
+
+        // Center - Main FAB
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .scale(fabScale)
+                    .size(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Enhanced progress rings
+                if (holdProgress > 0f) {
+                    // Pulsing outer ring animation
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.15f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseScale"
+                    )
+
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.4f,
+                        targetValue = 0.1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
+                    )
+
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        val centerX = size.width / 2
+                        val centerY = size.height / 2
+                        val baseRadius = size.minDimension / 2
+
+                        // Outer pulsing ring
+                        drawCircle(
+                            color = Orange.copy(alpha = pulseAlpha),
+                            radius = baseRadius * pulseScale,
+                            center = Offset(centerX, centerY),
+                            style = Stroke(width = 3.dp.toPx())
+                        )
+
+                        // Background track (subtle)
+                        val trackStrokeWidth = 4.dp.toPx()
+                        val trackRadius = baseRadius - 12.dp.toPx()
+                        drawArc(
+                            color = Orange.copy(alpha = 0.15f),
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = Offset(
+                                centerX - trackRadius,
+                                centerY - trackRadius
+                            ),
+                            size = Size(trackRadius * 2, trackRadius * 2),
+                            style = Stroke(
+                                width = trackStrokeWidth,
+                                cap = StrokeCap.Round
                             )
-                            Text(
-                                text = "Disable battery optimization for better app blocking",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                        )
+
+                        // Main progress arc with gradient-like effect (multiple layers)
+                        val mainStrokeWidth = 8.dp.toPx()
+                        val mainRadius = baseRadius - 12.dp.toPx()
+
+                        // Glow layer (slightly larger, more transparent)
+                        drawArc(
+                            color = Orange.copy(alpha = 0.3f),
+                            startAngle = -90f,
+                            sweepAngle = 360f * holdProgress,
+                            useCenter = false,
+                            topLeft = Offset(
+                                centerX - mainRadius - 2.dp.toPx(),
+                                centerY - mainRadius - 2.dp.toPx()
+                            ),
+                            size = Size(
+                                (mainRadius + 2.dp.toPx()) * 2,
+                                (mainRadius + 2.dp.toPx()) * 2
+                            ),
+                            style = Stroke(
+                                width = mainStrokeWidth + 4.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        )
+
+                        // Main solid arc
+                        drawArc(
+                            color = Orange,
+                            startAngle = -90f,
+                            sweepAngle = 360f * holdProgress,
+                            useCenter = false,
+                            topLeft = Offset(
+                                centerX - mainRadius,
+                                centerY - mainRadius
+                            ),
+                            size = Size(mainRadius * 2, mainRadius * 2),
+                            style = Stroke(
+                                width = mainStrokeWidth,
+                                cap = StrokeCap.Round
+                            )
+                        )
+
+                        // Leading edge glow dot
+                        if (holdProgress > 0.05f) {
+                            val angle = (-90f + 360f * holdProgress) * (PI / 180f)
+                            val dotX = centerX + mainRadius * cos(angle).toFloat()
+                            val dotY = centerY + mainRadius * sin(angle).toFloat()
+
+                            // Outer glow
+                            drawCircle(
+                                color = Orange.copy(alpha = 0.3f),
+                                radius = 12.dp.toPx(),
+                                center = Offset(dotX, dotY)
                             )
 
-                            BatteryOptimizationHelper.getManufacturerInstructions()?.let { instructions ->
-                                Text(
-                                    text = instructions,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                        TextButton(
-                            onClick = {
-                                BatteryOptimizationHelper.openBatteryOptimizationSettings(context)
-                            }
-                        ) {
-                            Text(
-                                "Settings",
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            // Inner bright dot
+                            drawCircle(
+                                color = Orange,
+                                radius = 6.dp.toPx(),
+                                center = Offset(dotX, dotY)
+                            )
+
+                            // Center highlight
+                            drawCircle(
+                                color = Color.White,
+                                radius = 3.dp.toPx(),
+                                center = Offset(dotX, dotY)
                             )
                         }
                     }
                 }
-            }
 
-            // Bottom - App Selection Bar
-            Surface(
-                color = if (appsBlocked)
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                else
-                    MaterialTheme.colorScheme.surfaceVariant,
+                // Main FAB
+                val icon: ImageVector = when {
+                    showScanSuccess -> Icons.Default.Check
+                    appsBlocked -> Icons.Default.Lock
+                    else -> Icons.Default.LockOpen
+                }
+
+                val iconRotation by animateFloatAsState(
+                    targetValue = if (showScanSuccess) 360f else 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "iconRotation"
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .size(180.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = {
+                                    // Short tap - show NFC dialog
+                                    if (!showScanSuccess && !showScanningDialog) {
+                                        if (nfcAdapter == null) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    "NFC not available on this device",
+                                                    Toast.LENGTH_LONG
+                                                )
+                                                .show()
+                                        } else if (!nfcAdapter.isEnabled) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    "Please enable NFC in Settings",
+                                                    Toast.LENGTH_LONG
+                                                )
+                                                .show()
+                                        } else {
+                                            showScanningDialog = true
+                                            isNfcReading = true
+                                        }
+                                    }
+                                },
+                                onPress = @RequiresPermission(Manifest.permission.VIBRATE) {
+                                    // Long press - hold to block
+                                    if (!appsBlocked && !showScanSuccess && !showScanningDialog) {
+                                        isHolding = true
+
+                                        // Start haptic
+                                        vibrator?.vibrate(
+                                            VibrationEffect.createOneShot(
+                                                50,
+                                                VibrationEffect.DEFAULT_AMPLITUDE
+                                            )
+                                        )
+                                    }
+
+                                    tryAwaitRelease()
+                                    isHolding = false
+                                }
+                            )
+                        },
+                    shape = CircleShape,
+                    color = fabColor,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 8.dp
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = if (appsBlocked) "Unlock apps" else "Lock apps",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .rotate(iconRotation)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (appsBlocked &&
+            !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+        ) {
+
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .offset(y = bottomBarOffset)
-                    .clickable(enabled = !appsBlocked) {
-                        showAppSelector = true
-                    }
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                ),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
-                    horizontalArrangement = Arrangement.Center,
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (appsBlocked) Icons.Default.Lock else Icons.Default.Apps,
-                        contentDescription = null,
-                        tint = if (appsBlocked)
-                            MaterialTheme.colorScheme.error
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        imageVector = Icons.Default.BatteryAlert,
+                        contentDescription = "Battery optimization warning",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = if (appsBlocked) {
-                            "${selectedApps.size} Apps Locked"
-                        } else {
-                            if (selectedApps.isEmpty()) "Select Apps to Block" else "${selectedApps.size} Apps Selected"
-                        },
-                        color = if (appsBlocked)
-                            MaterialTheme.colorScheme.error
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Improve Reliability",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            text = "Disable battery optimization for better app blocking",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                        )
+
+                        BatteryOptimizationHelper.getManufacturerInstructions()
+                            ?.let { instructions ->
+                                Text(
+                                    text = instructions,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    fontStyle = FontStyle.Italic,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                    }
+                    TextButton(
+                        onClick = {
+                            BatteryOptimizationHelper.openBatteryOptimizationSettings(context)
+                        }
+                    ) {
+                        Text(
+                            "Settings",
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
                 }
+            }
+        }
+
+        // Bottom - App Selection Bar
+        Surface(
+            color = if (appsBlocked)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = bottomBarOffset)
+                .clickable(enabled = !appsBlocked) {
+                    showAppSelector = true
+                }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (appsBlocked) Icons.Default.Lock else Icons.Default.Apps,
+                    contentDescription = null,
+                    tint = if (appsBlocked)
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = if (appsBlocked) {
+                        "${selectedApps.size} Apps Locked"
+                    } else {
+                        if (selectedApps.isEmpty()) "Select Apps to Block" else "${selectedApps.size} Apps Selected"
+                    },
+                    color = if (appsBlocked)
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
@@ -1106,7 +1136,11 @@ fun HomeScreen(
                 FilledTonalButton(
                     onClick = {
                         AppBlockingManager.saveBlockedApps(context, selectedApps)
-                        Toast.makeText(context, "${selectedApps.size} apps selected", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "${selectedApps.size} apps selected",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         showAppSelector = false
                     }
                 ) {

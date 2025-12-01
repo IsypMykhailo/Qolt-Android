@@ -13,6 +13,10 @@ import javax.inject.Inject
 class StatisticsViewModel @Inject constructor(
     private val presetManager: WidgetPresetManager
 ) : ViewModel() {
+
+    companion object {
+        const val TAG = "StatisticsViewModel"
+    }
     
     private val _filters = MutableStateFlow(StatisticsFilters())
     val filters: StateFlow<StatisticsFilters> = _filters.asStateFlow()

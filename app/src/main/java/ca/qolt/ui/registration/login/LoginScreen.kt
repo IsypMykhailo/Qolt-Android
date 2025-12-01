@@ -1,5 +1,6 @@
-package ca.qolt
+package ca.qolt.ui.registration.login
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.R
+
+@Composable
+fun Login(modifier: Modifier = Modifier, viewModel: LoginViewModel) {
+    BackHandler { viewModel.navigator.navigateBack() }
+    LoginScreen(
+        viewModel::onBack,
+        viewModel::onLogin,
+        viewModel::onCreateAccount,
+        viewModel::onForgotPassword
+    )
+}
 
 @Composable
 fun LoginScreen(
@@ -125,8 +138,8 @@ fun LoginScreen(
                 trailingIcon = {
                     Icon(
                         painter = painterResource(
-                            if (showPassword) android.R.drawable.ic_menu_close_clear_cancel
-                            else android.R.drawable.ic_partial_secure
+                            if (showPassword) R.drawable.ic_menu_close_clear_cancel
+                            else R.drawable.ic_partial_secure
                         ),
                         contentDescription = null,
                         tint = Color.White,
@@ -231,19 +244,19 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 SocialLoginButton(
-                    icon = R.drawable.google_icon,
+                    icon = ca.qolt.R.drawable.google_icon,
                     borderColor = Color(0xFFDB4437),
                     onClick = onGoogle
                 )
 
                 SocialLoginButton(
-                    icon = R.drawable.facebook_icon,
+                    icon = ca.qolt.R.drawable.facebook_icon,
                     borderColor = Color(0xFF1877F2),
                     onClick = onFacebook
                 )
 
                 SocialLoginButton(
-                    icon = R.drawable.apple_icon,
+                    icon = ca.qolt.R.drawable.apple_icon,
                     borderColor = Color.White,
                     onClick = onApple
                 )
@@ -262,7 +275,7 @@ fun LoginScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        painter = painterResource(R.drawable.error_icon),
+                        painter = painterResource(ca.qolt.R.drawable.error_icon),
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(18.dp)
