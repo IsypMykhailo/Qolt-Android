@@ -23,8 +23,15 @@ class PresetRepository @Inject constructor(
     suspend fun updatePreset(preset: PresetEntity): Int =
             qoltDatabase.presetDao().updatePreset(preset)
 
-    suspend fun deletePreset(preset: PresetEntity): Int =
-            qoltDatabase.presetDao().deletePreset(preset)
+    suspend fun deletePreset(preset: PresetEntity): Int {
+        // Check if this is the current preset
+        val currentId = getCurrentPresetId()
+        if (currentId == preset.id) {
+            // Clear current preset if it's being deleted
+            removeCurrentPresetId()
+        }
+        return qoltDatabase.presetDao().deletePreset(preset)
+    }
 
     suspend fun getCurrentPresetId(): String? = presetsPreferences.getCurrentPresetId()
     suspend fun setCurrentPresetId(presetId: String) = presetsPreferences.setCurrentPresetId(presetId)

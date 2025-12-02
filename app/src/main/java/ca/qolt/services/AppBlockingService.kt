@@ -34,6 +34,9 @@ class AppBlockingService : Service() {
     @Inject
     lateinit var settingsRepository: SettingsRepository
 
+    @Inject
+    lateinit var appBlockingRepository: ca.qolt.data.repository.AppBlockingRepository
+
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var blockedApps: Set<String> = emptySet()
     private var monitoringJob: Job? = null
@@ -79,18 +82,19 @@ class AppBlockingService : Service() {
         // Try to get apps from intent first (normal startup)
         val appsFromIntent = intent?.getStringArrayListExtra("blocked_apps")?.toSet()
 
-        // If intent is null or empty, restore from SharedPreferences (service restart)
+        // If intent is null or empty, restore from DataStore (service restart)
         blockedApps = if (!appsFromIntent.isNullOrEmpty()) {
             Timber.tag(TAG).d("Service started with intent: ${appsFromIntent.size} apps")
             appsFromIntent
         } else {
-            val restored = AppBlockingManager.getBlockedApps(this)
-            Timber.tag(TAG).d("Service restarted - restored ${restored.size} apps from preferences")
+            val restored = runBlocking { appBlockingRepository.getBlockedApps() }
+            Timber.tag(TAG).d("Service restarted - restored ${restored.size} apps from repository")
             restored
         }
 
         // Verify we should still be running
-        if (!AppBlockingManager.isBlockingActive(this)) {
+        val isActive = runBlocking { appBlockingRepository.isBlockingActive() }
+        if (!isActive) {
             Timber.tag(TAG).w("Service started but blocking not active - stopping")
             stopSelf()
             return START_NOT_STICKY
@@ -165,7 +169,7 @@ class AppBlockingService : Service() {
     }
 
     private suspend fun checkAndBlockApps() {
-        if (!AppBlockingManager.isBlockingActive(this)) {
+        if (!appBlockingRepository.isBlockingActive()) {
             stopSelf()
             return
         }

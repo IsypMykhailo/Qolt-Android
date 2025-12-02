@@ -7,7 +7,7 @@ import android.os.Build
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import ca.qolt.services.AppBlockingManager
+import ca.qolt.data.repository.AppBlockingRepository
 import ca.qolt.services.AppBlockingService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -16,7 +16,8 @@ import timber.log.Timber
 @HiltWorker
 class ServiceHealthCheckWorker @AssistedInject constructor(
     @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters
+    @Assisted workerParams: WorkerParameters,
+    private val appBlockingRepository: AppBlockingRepository
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -25,12 +26,12 @@ class ServiceHealthCheckWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         // Only proceed if blocking should be active
-        if (!AppBlockingManager.isBlockingActive(applicationContext)) {
+        if (!appBlockingRepository.isBlockingActive()) {
             Timber.tag(TAG).d("Blocking not active - skipping health check")
             return Result.success()
         }
 
-        val blockedApps = AppBlockingManager.getBlockedApps(applicationContext)
+        val blockedApps = appBlockingRepository.getBlockedApps()
         if (blockedApps.isEmpty()) {
             Timber.tag(TAG).d("No blocked apps - skipping health check")
             return Result.success()

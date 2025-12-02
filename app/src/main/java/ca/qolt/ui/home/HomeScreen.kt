@@ -7,8 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.Canvas
-import android.graphics.drawable.Drawable
 import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
 import android.nfc.Tag
@@ -31,7 +29,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -46,8 +43,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,8 +57,6 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -87,9 +80,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -99,8 +90,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
-import ca.qolt.model.InstalledApp
 import ca.qolt.ui.theme.Orange
 import ca.qolt.ui.theme.SuccessGreen
 import ca.qolt.ui.theme.SurfaceElevated
@@ -110,7 +99,6 @@ import kotlinx.coroutines.launch
 import java.nio.charset.Charset
 import kotlin.math.min
 import androidx.core.content.edit
-import ca.qolt.services.AppBlockingManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -118,40 +106,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-
-private fun loadInstalledApps(context: Context): List<InstalledApp> {
-    val pm = context.packageManager
-    val ownPackageName = context.packageName
-
-    return pm.getInstalledApplications(PackageManager.GET_META_DATA)
-        .filter { appInfo ->
-            // Exclude Qolt app itself and only include apps with launch intent
-            pm.getLaunchIntentForPackage(appInfo.packageName) != null &&
-                    appInfo.packageName != ownPackageName
-        }
-        .map { appInfo ->
-            InstalledApp(
-                packageName = appInfo.packageName,
-                appName = pm.getApplicationLabel(appInfo).toString(),
-                icon = pm.getApplicationIcon(appInfo),
-                category = appInfo.category
-            )
-        }
-        .sortedBy { it.appName.lowercase() }
-}
-
-@Composable
-private fun rememberAppIcon(drawable: Drawable): ImageBitmap {
-    return remember(drawable) {
-        val w = drawable.intrinsicWidth.coerceAtLeast(1)
-        val h = drawable.intrinsicHeight.coerceAtLeast(1)
-        val bmp = createBitmap(w, h)
-        val canvas = Canvas(bmp)
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
-        drawable.draw(canvas)
-        bmp.asImageBitmap()
-    }
-}
 
 private fun readNdefMessage(tag: Tag): String? {
     try {
@@ -251,7 +205,8 @@ private fun parseUriRecord(record: NdefRecord): String? {
 @Composable
 fun Home(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel
+    viewModel: HomeViewModel,
+    onNavigateToPresets: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -280,14 +235,13 @@ fun Home(
     val emergencyUnlockEnabled by viewModel.emergencyUnlockEnabled.collectAsState(initial = false)
 
     val currentStreak by viewModel.currentStreak.collectAsState()
+    val currentPreset by viewModel.currentPreset.collectAsState()
+    val isBlockingActive by viewModel.isBlockingActive.collectAsState()
 
-    var showAppSelector by remember { mutableStateOf(false) }
-    var allApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
-    var selectedApps by remember { mutableStateOf(setOf<String>()) }
+    var showNoPresetDialog by remember { mutableStateOf(false) }
 
     var showScanSuccess by remember { mutableStateOf(false) }
     var lastCheckedAction by remember { mutableStateOf<String?>(null) }
-    var appsBlocked by remember { mutableStateOf(AppBlockingManager.isBlockingActive(context)) }
 
     var holdProgress by remember { mutableStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
@@ -296,21 +250,11 @@ fun Home(
     var emergencyShake by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val savedApps = AppBlockingManager.getBlockedApps(context)
-        if (savedApps.isNotEmpty()) {
-            selectedApps = savedApps
-        }
         isVisible = true
     }
 
-    LaunchedEffect(showAppSelector) {
-        if (showAppSelector && allApps.isEmpty()) {
-            allApps = loadInstalledApps(context)
-        }
-    }
-
     LaunchedEffect(isHolding) {
-        if (isHolding && !appsBlocked && !showScanSuccess && !showScanningDialog) {
+        if (isHolding && !isBlockingActive && !showScanSuccess && !showScanningDialog) {
 
             delay(500)
             if (!isHolding) {
@@ -324,48 +268,71 @@ fun Home(
                 holdProgress = min((elapsed / 3000f), 1f)
 
                 if (holdProgress >= 1f) {
-                    if (selectedApps.isNotEmpty()) {
-                        if (!AppBlockingManager.hasUsageStatsPermission(context)) {
-                            Toast.makeText(
-                                context,
-                                "Please grant Usage Access permission",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            AppBlockingManager.requestUsageStatsPermission(context)
-                        } else if (!AppBlockingManager.hasOverlayPermission(context)) {
-                            Toast.makeText(
-                                context,
-                                "Please grant Display Over Other Apps permission",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            AppBlockingManager.requestOverlayPermission(context)
-                        } else {
-                            AppBlockingManager.saveBlockedApps(context, selectedApps)
-                            AppBlockingManager.blockApps(context, selectedApps)
-                            appsBlocked = true
-                            showScanSuccess = true
-
-                            viewModel.refreshStreak()
-
-                            vibrator?.vibrate(
-                                VibrationEffect.createOneShot(
-                                    200,
-                                    VibrationEffect.DEFAULT_AMPLITUDE
-                                )
-                            )
-
-                            Toast.makeText(
-                                context,
-                                "${selectedApps.size} Apps Blocked",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    } else {
+                    // Validate preset exists
+                    if (currentPreset == null) {
+                        showNoPresetDialog = true
                         Toast.makeText(
                             context,
-                            "No apps selected to block",
+                            "Please select a preset first",
                             Toast.LENGTH_SHORT
                         ).show()
+                    } else if (currentPreset!!.blockedApps.isEmpty()) {
+                        Toast.makeText(
+                            context,
+                            "This preset has no apps to block",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        // Start blocking with current preset
+                        scope.launch {
+                            val result = viewModel.startBlockingCurrentPreset()
+
+                            result.onSuccess {
+                                showScanSuccess = true
+                                viewModel.refreshStreak()
+
+                                vibrator?.vibrate(
+                                    VibrationEffect.createOneShot(
+                                        200,
+                                        VibrationEffect.DEFAULT_AMPLITUDE
+                                    )
+                                )
+
+                                Toast.makeText(
+                                    context,
+                                    "${currentPreset!!.blockedApps.size} Apps Blocked",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }.onFailure { error ->
+                                when (error.message) {
+                                    "USAGE_STATS_PERMISSION_REQUIRED" -> {
+                                        Toast.makeText(
+                                            context,
+                                            "Please grant Usage Access permission",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        viewModel.requestUsageStatsPermission()
+                                    }
+
+                                    "OVERLAY_PERMISSION_REQUIRED" -> {
+                                        Toast.makeText(
+                                            context,
+                                            "Please grant Display Over Other Apps permission",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        viewModel.requestOverlayPermission()
+                                    }
+
+                                    else -> {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to start blocking: ${error.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }
                     }
                     holdProgress = 0f
                     isHolding = false
@@ -374,6 +341,13 @@ fun Home(
             }
         } else {
             holdProgress = 0f
+        }
+    }
+
+    // Refresh preset when returning from Presets page
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            viewModel.refreshCurrentPreset()
         }
     }
 
@@ -408,50 +382,59 @@ fun Home(
                                 showScanningDialog = false
                                 isNfcReading = false
 
-                                if (!appsBlocked) {
-                                    if (selectedApps.isNotEmpty()) {
-                                        if (!AppBlockingManager.hasUsageStatsPermission(context)) {
-                                            Toast.makeText(
-                                                context,
-                                                "Please grant Usage Access permission",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                            AppBlockingManager.requestUsageStatsPermission(context)
-                                        } else if (!AppBlockingManager.hasOverlayPermission(context)) {
-                                            Toast.makeText(
-                                                context,
-                                                "Please grant Display Over Other Apps permission",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                            AppBlockingManager.requestOverlayPermission(context)
-                                        } else {
-                                            AppBlockingManager.saveBlockedApps(
-                                                context,
-                                                selectedApps
-                                            )
-                                            AppBlockingManager.blockApps(context, selectedApps)
-                                            appsBlocked = true
+                                if (!isBlockingActive) {
+                                    if (currentPreset != null && currentPreset!!.blockedApps.isNotEmpty()) {
+                                        scope.launch {
+                                            val result = viewModel.startBlockingCurrentPreset()
 
-                                            viewModel.refreshStreak()
+                                            result.onSuccess {
+                                                viewModel.refreshStreak()
+                                                Toast.makeText(
+                                                    context,
+                                                    "${currentPreset!!.blockedApps.size} Apps Blocked",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }.onFailure { error ->
+                                                when (error.message) {
+                                                    "USAGE_STATS_PERMISSION_REQUIRED" -> {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Please grant Usage Access permission",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                        viewModel.requestUsageStatsPermission()
+                                                    }
 
-                                            Toast.makeText(
-                                                context,
-                                                "${selectedApps.size} Apps Blocked",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+                                                    "OVERLAY_PERMISSION_REQUIRED" -> {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Please grant Display Over Other Apps permission",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                        viewModel.requestOverlayPermission()
+                                                    }
+
+                                                    else -> {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Failed to start blocking",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
+                                            }
                                         }
                                     } else {
+                                        showNoPresetDialog = true
                                         Toast.makeText(
                                             context,
-                                            "No apps selected to block",
+                                            "Please select a preset first",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
                                 } else {
                                     scope.launch {
-                                        viewModel.endSession()
-                                        AppBlockingManager.unblockApps(context)
-                                        appsBlocked = false
+                                        viewModel.stopBlocking()
                                     }
                                     Toast.makeText(
                                         context,
@@ -568,7 +551,7 @@ fun Home(
     val fabColor by animateColorAsState(
         targetValue = when {
             showScanSuccess -> SuccessGreen
-            appsBlocked -> MaterialTheme.colorScheme.errorContainer
+            isBlockingActive -> MaterialTheme.colorScheme.errorContainer
             else -> MaterialTheme.colorScheme.primary
         },
         animationSpec = spring<Color>(
@@ -627,7 +610,7 @@ fun Home(
                 }
             }
 
-            if (appsBlocked) {
+            if (isBlockingActive) {
                 Surface(
                     color = if (emergencyUsedToday)
                         MaterialTheme.colorScheme.surfaceVariant
@@ -642,10 +625,7 @@ fun Home(
                         ) {
                             if (!emergencyUsedToday) {
                                 scope.launch @RequiresPermission(Manifest.permission.VIBRATE) {
-                                    viewModel.endSession()
-
-                                    AppBlockingManager.unblockApps(context)
-                                    appsBlocked = false
+                                    viewModel.stopBlocking()
                                     emergencyUsedToday = true
 
                                     prefs.edit {
@@ -848,7 +828,7 @@ fun Home(
                 // Main FAB
                 val icon: ImageVector = when {
                     showScanSuccess -> Icons.Default.Check
-                    appsBlocked -> Icons.Default.Lock
+                    isBlockingActive -> Icons.Default.Lock
                     else -> Icons.Default.LockOpen
                 }
 
@@ -893,7 +873,7 @@ fun Home(
                                 },
                                 onPress = @RequiresPermission(Manifest.permission.VIBRATE) {
                                     // Long press - hold to block
-                                    if (!appsBlocked && !showScanSuccess && !showScanningDialog) {
+                                    if (!isBlockingActive && !showScanSuccess && !showScanningDialog) {
                                         isHolding = true
 
                                         // Start haptic
@@ -921,7 +901,7 @@ fun Home(
                     ) {
                         Icon(
                             imageVector = icon,
-                            contentDescription = if (appsBlocked) "Unlock apps" else "Lock apps",
+                            contentDescription = if (isBlockingActive) "Unlock apps" else "Lock apps",
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier
                                 .size(80.dp)
@@ -932,7 +912,7 @@ fun Home(
             }
         }
 
-        if (appsBlocked &&
+        if (isBlockingActive &&
             !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
         ) {
 
@@ -996,17 +976,17 @@ fun Home(
             }
         }
 
-        // Bottom - App Selection Bar
+        // Bottom - Preset Display Bar
         Surface(
-            color = if (appsBlocked)
+            color = if (isBlockingActive)
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
             else
                 MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
                 .fillMaxWidth()
                 .offset(y = bottomBarOffset)
-                .clickable(enabled = !appsBlocked) {
-                    showAppSelector = true
+                .clickable(enabled = !isBlockingActive) {
+                    onNavigateToPresets()
                 }
         ) {
             Row(
@@ -1016,137 +996,85 @@ fun Home(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (appsBlocked) Icons.Default.Lock else Icons.Default.Apps,
-                    contentDescription = null,
-                    tint = if (appsBlocked)
-                        MaterialTheme.colorScheme.error
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = if (appsBlocked) {
-                        "${selectedApps.size} Apps Locked"
-                    } else {
-                        if (selectedApps.isEmpty()) "Select Apps to Block" else "${selectedApps.size} Apps Selected"
-                    },
-                    color = if (appsBlocked)
-                        MaterialTheme.colorScheme.error
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                if (currentPreset != null) {
+                    // Show emoji
+                    Text(
+                        text = currentPreset!!.emoji,
+                        fontSize = 24.sp,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+
+                    // Show preset name
+                    Text(
+                        text = currentPreset!!.name,
+                        color = if (isBlockingActive)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Show app count
+                    Text(
+                        text = "(${currentPreset!!.blockedApps.size})",
+                        color = if (isBlockingActive)
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 16.sp
+                    )
+                } else {
+                    // No preset selected
+                    Icon(
+                        imageVector = Icons.Default.Apps,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "No Preset Selected",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontStyle = FontStyle.Italic
+                    )
+                }
             }
         }
     }
 
-    // App Selector Dialog
-    if (showAppSelector) {
+    // No Preset Selected Dialog
+    if (showNoPresetDialog) {
         AlertDialog(
-            onDismissRequest = { showAppSelector = false },
+            onDismissRequest = { showNoPresetDialog = false },
             title = {
                 Text(
-                    text = "Select Apps to Block",
+                    text = "No Preset Selected",
                     style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(400.dp)
-                ) {
-                    if (allApps.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            itemsIndexed(allApps) { _, app ->
-                                val isChecked = app.packageName in selectedApps
-
-                                val itemAlpha by animateFloatAsState(
-                                    targetValue = 1f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow
-                                    ),
-                                    label = "itemAlpha"
-                                )
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .alpha(itemAlpha)
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val iconBitmap = rememberAppIcon(app.icon)
-                                    Image(
-                                        bitmap = iconBitmap,
-                                        contentDescription = app.appName,
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .padding(end = 12.dp)
-                                    )
-
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text(
-                                            text = app.appName,
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        Text(
-                                            text = app.packageName,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    Checkbox(
-                                        checked = isChecked,
-                                        onCheckedChange = { checked ->
-                                            selectedApps = if (checked) {
-                                                selectedApps + app.packageName
-                                            } else {
-                                                selectedApps - app.packageName
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                Text(
+                    text = "Please select a preset from the Presets page before starting app blocking.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
             },
             confirmButton = {
                 FilledTonalButton(
                     onClick = {
-                        AppBlockingManager.saveBlockedApps(context, selectedApps)
-                        Toast.makeText(
-                            context,
-                            "${selectedApps.size} apps selected",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        showAppSelector = false
+                        showNoPresetDialog = false
+                        onNavigateToPresets()
                     }
                 ) {
-                    Text("Done")
+                    Text("Go to Presets")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAppSelector = false }) {
+                TextButton(onClick = { showNoPresetDialog = false }) {
                     Text("Cancel")
                 }
             }
