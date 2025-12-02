@@ -24,13 +24,17 @@ import androidx.compose.ui.unit.sp
 import android.R
 
 @Composable
-fun Login(modifier: Modifier = Modifier, viewModel: LoginViewModel) {
-    BackHandler { viewModel.navigator.navigateBack() }
+fun Login(
+    modifier: Modifier = Modifier,
+    viewModel: LoginViewModel
+) {
+    BackHandler { viewModel.onBack() }
+
     LoginScreen(
-        viewModel::onBack,
-        viewModel::onLogin,
-        viewModel::onCreateAccount,
-        viewModel::onForgotPassword
+        onBack = viewModel::onBack,
+        onLogin = viewModel::onLogin,
+        onCreateAccount = viewModel::onCreateAccount,
+        onForgotPassword = viewModel::onForgotPassword
     )
 }
 

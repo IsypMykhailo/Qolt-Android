@@ -1,22 +1,26 @@
 package ca.qolt.services
 
-import android.app.*
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import ca.qolt.ui.home.BlockingOverlay
-import ca.qolt.ui.MainActivity
 import ca.qolt.R
 import ca.qolt.data.local.SessionManager
 import ca.qolt.data.repository.UsageSessionRepository
+import ca.qolt.data.repository.SettingsRepository
+import ca.qolt.ui.MainActivity
+import ca.qolt.ui.home.BlockingOverlay
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import timber.log.Timber
 import javax.inject.Inject
-import ca.qolt.util.PreferencesManager
 
 @AndroidEntryPoint
 class AppBlockingService : Service() {
@@ -26,6 +30,10 @@ class AppBlockingService : Service() {
 
     @Inject
     lateinit var sessionManager: SessionManager
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var blockedApps: Set<String> = emptySet()
     private var monitoringJob: Job? = null
@@ -34,7 +42,11 @@ class AppBlockingService : Service() {
     private var lastBlockTime: Long = 0
     private var blockingOverlay: BlockingOverlay? = null
     private var timerStartTime: Long = 0L
+    @Volatile
     private var blockTimerEnabled: Boolean = false
+
+    @Volatile
+    private var liveActivityEnabled: Boolean = true
 
     companion object {
         private const val TAG = "AppBlockingService"
@@ -51,6 +63,15 @@ class AppBlockingService : Service() {
         // Close any orphaned sessions from previous crashes
         serviceScope.launch {
             usageSessionRepository.closeAnyOrphanedSessions()
+        }
+
+        serviceScope.launch {
+            try {
+                blockTimerEnabled = settingsRepository.getBlockTimerEnabled()
+                liveActivityEnabled = settingsRepository.getLiveActivityEnabled()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to load settings from DataStore")
+            }
         }
     }
 
@@ -82,11 +103,9 @@ class AppBlockingService : Service() {
             return START_NOT_STICKY
         }
 
-        blockTimerEnabled = PreferencesManager.getBlockTimerEnabled(applicationContext)
         if (blockTimerEnabled) {
             timerStartTime = System.currentTimeMillis()
         }
-
         val initialTimerText = if (blockTimerEnabled) "00:00:00" else null
         val notification = createNotification(initialTimerText)
         startForeground(NOTIFICATION_ID, notification)
@@ -172,12 +191,14 @@ class AppBlockingService : Service() {
 
             if (foregroundPackage.isNotEmpty() &&
                 foregroundPackage in blockedApps &&
-                foregroundPackage != packageName) {
+                foregroundPackage != packageName
+            ) {
 
                 Timber.tag(TAG).d("Blocked app detected: $foregroundPackage")
 
-                val shouldBlock = (foregroundPackage != lastBlockedApp) ||
-                                 (currentTime - lastBlockTime > BLOCK_COOLDOWN_MS)
+                val shouldBlock =
+                    (foregroundPackage != lastBlockedApp) ||
+                            (currentTime - lastBlockTime > BLOCK_COOLDOWN_MS)
 
                 if (shouldBlock) {
                     lastBlockedApp = foregroundPackage
@@ -246,8 +267,6 @@ class AppBlockingService : Service() {
                     blockedApps.take(3).joinToString(", ") { getAppName(it) } +
                     if (blockedApps.size > 3) "..." else ""
         }
-
-        val liveActivityEnabled = PreferencesManager.getLiveActivityEnabled(this)
 
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Qolt App Blocking Active")

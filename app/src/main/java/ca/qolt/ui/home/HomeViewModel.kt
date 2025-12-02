@@ -2,6 +2,7 @@ package ca.qolt.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ca.qolt.data.repository.SettingsRepository
 import ca.qolt.data.repository.UsageSessionRepository
 import ca.qolt.domain.SessionTrackingManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +16,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val usageSessionRepository: UsageSessionRepository,
-    private val sessionTrackingManager: SessionTrackingManager
+    private val sessionTrackingManager: SessionTrackingManager,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     companion object {
@@ -24,9 +26,15 @@ class HomeViewModel @Inject constructor(
 
     private val _currentStreak = MutableStateFlow(0)
     val currentStreak: StateFlow<Int> = _currentStreak.asStateFlow()
+    private val _emergencyUnlockEnabled = MutableStateFlow(false)
+    val emergencyUnlockEnabled: StateFlow<Boolean> = _emergencyUnlockEnabled
 
     init {
         refreshStreak()
+        viewModelScope.launch {
+            _emergencyUnlockEnabled.value = settingsRepository.getEmergencyUnlockEnabled()
+        }
+
     }
 
     /**

@@ -1,20 +1,20 @@
 package ca.qolt.ui.registration.login
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import ca.qolt.data.repository.SettingsRepository
 import ca.qolt.ui.navigation.Destination
 import ca.qolt.ui.navigation.Navigator
-import ca.qolt.util.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    val navigator: Navigator,
-    @ApplicationContext
-    val context: Context
-): ViewModel() {
+    private val navigator: Navigator,
+    private val settingsRepository: SettingsRepository
+) : ViewModel() {
+
     companion object {
         const val TAG = "LoginViewModel"
     }
@@ -32,7 +32,9 @@ class LoginViewModel @Inject constructor(
     }
 
     fun onLogin() {
-        PreferencesManager.setLoggedIn(context, true)
-        navigator.navigateTo(Destination.Main.route, popBackstack = true)
+        viewModelScope.launch {
+            settingsRepository.setLoggedIn(true)
+            navigator.navigateTo(Destination.Main.route, popBackstack = true)
+        }
     }
 }

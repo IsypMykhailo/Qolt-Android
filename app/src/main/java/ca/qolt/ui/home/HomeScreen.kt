@@ -32,7 +32,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -40,16 +39,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -104,7 +100,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
-import androidx.hilt.navigation.compose.hiltViewModel
 import ca.qolt.model.InstalledApp
 import ca.qolt.ui.theme.Orange
 import ca.qolt.ui.theme.SuccessGreen
@@ -122,7 +117,6 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-import ca.qolt.util.PreferencesManager
 
 
 private fun loadInstalledApps(context: Context): List<InstalledApp> {
@@ -283,9 +277,7 @@ fun Home(
     var emergencyUsedToday by remember {
         mutableStateOf(lastEmergencyDate == currentDate)
     }
-    var emergencyUnlockEnabled by remember {
-        mutableStateOf(PreferencesManager.getEmergencyUnlockEnabled(context))
-    }
+    val emergencyUnlockEnabled by viewModel.emergencyUnlockEnabled.collectAsState(initial = false)
 
     val currentStreak by viewModel.currentStreak.collectAsState()
 
