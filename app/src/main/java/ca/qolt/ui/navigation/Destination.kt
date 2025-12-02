@@ -14,7 +14,9 @@ object Destination {
         data object Home : Screen("main/home")
         data object Blocks : Screen("main/blocks")
         data object Statistics : Screen("main/statistics")
-        data object Profile : Screen("main/profile")
+        data object Profile : Screen("main/profile") {
+            data object HelpCenter : Screen("main/profile/helpCenter")
+        }
     }
 
     abstract class Screen(baseRoute: String) {

@@ -1,7 +1,5 @@
 package ca.qolt.ui.navigation
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -9,8 +7,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import ca.qolt.ui.account.HelpCenter
 import ca.qolt.ui.account.Profile
 import ca.qolt.ui.account.ProfileViewModel
+import ca.qolt.ui.account.HelpCenterViewModel
 import ca.qolt.ui.blocks.Presets
 import ca.qolt.ui.blocks.PresetsViewModel
 import ca.qolt.ui.home.Home
@@ -84,6 +84,10 @@ fun NavGraph(
             composable(Destination.Main.Profile.route) {
                 val viewModel: ProfileViewModel = hiltViewModel(key = ProfileViewModel.TAG)
                 Profile(modifier, viewModel)
+            }
+            composable(Destination.Main.Profile.HelpCenter.route) {
+                val viewModel: HelpCenterViewModel = hiltViewModel(key = HelpCenterViewModel.TAG)
+                HelpCenter(modifier, viewModel)
             }
         }
     }
