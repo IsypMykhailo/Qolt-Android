@@ -11,7 +11,6 @@ object PreferencesManager {
     private const val KEY_EMERGENCY_UNLOCK = "emergency_unlock"
     private const val KEY_DARK_MODE = "dark_mode"
     private const val KEY_LIVE_ACTIVITY = "live_activity"
-    private const val KEY_APP_DELETION = "app_deletion"
     private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
     private const val KEY_LANGUAGE = "language"
     private const val KEY_PROFILE_NAME = "profile_name"
@@ -67,15 +66,6 @@ object PreferencesManager {
     fun setLiveActivityEnabled(context: Context, enabled: Boolean) {
         getPreferences(context)
             .edit { putBoolean(KEY_LIVE_ACTIVITY, enabled) }
-    }
-
-    fun getAppDeletionEnabled(context: Context): Boolean =
-        getPreferences(context)
-            .getBoolean(KEY_APP_DELETION, false)
-
-    fun setAppDeletionEnabled(context: Context, enabled: Boolean) {
-        getPreferences(context)
-            .edit { putBoolean(KEY_APP_DELETION, enabled) }
     }
 
     fun getNotificationsEnabled(context: Context): Boolean =

@@ -89,7 +89,6 @@ fun ProfileScreen(
     var emergencyUnlock by remember { mutableStateOf(PreferencesManager.getEmergencyUnlockEnabled(context)) }
     var darkMode by remember { mutableStateOf(PreferencesManager.getDarkModeEnabled(context)) }
     var liveActivity by remember { mutableStateOf(PreferencesManager.getLiveActivityEnabled(context)) }
-    var appDeletion by remember { mutableStateOf(PreferencesManager.getAppDeletionEnabled(context)) }
     var notifications by remember { mutableStateOf(PreferencesManager.getNotificationsEnabled(context)) }
     var language by remember { mutableStateOf(PreferencesManager.getLanguage(context)) }
 
@@ -382,16 +381,27 @@ fun ProfileScreen(
                             subText = "See your session status on your Lock Screen.\nSilent notifications need to be enabled on the lock screen."
                         )
 
-                        "App Deletion" -> SettingToggleRow(
-                            icon = { Icon(Icons.Outlined.Delete, null, tint = Color.White) },
-                            label = "App Deletion",
-                            checked = appDeletion,
-                            onCheckedChange = {
-                                appDeletion = it
-                                PreferencesManager.setAppDeletionEnabled(context, it)
+                        "App Deletion" -> SettingRow(
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
                             },
-                            orange = orange,
-                            subText = "Prevent QOLT from being uninstalled."
+                            label = "Prevent App Deletion",
+                            subText = "Go to More security & privacy → Device admin apps",
+                            trailingContent = {
+                                Text(
+                                    text = "Open Settings",
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 13.sp
+                                )
+                            },
+                            onClick = {
+                                DeviceAdminHelper.openDeviceAdminSettings(context)
+                            }
                         )
 
                         "Notifications" -> SettingToggleRow(
@@ -592,36 +602,52 @@ private fun SettingToggleRow(
 fun SettingRow(
     icon: @Composable () -> Unit,
     label: String,
+    subText: String? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
             .clickable { onClick() }
-            .padding(horizontal = 0.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 6.dp)
     ) {
-        Box(
-            modifier = Modifier.size(28.dp),
-            contentAlignment = Alignment.Center
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            icon()
+
+            Box(
+                modifier = Modifier.size(28.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                icon()
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f)
+            )
+
+            trailingContent?.invoke()
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 15.sp,
-            modifier = Modifier.weight(1f)
-        )
-
-        trailingContent?.invoke()
+        if (subText != null) {
+            Text(
+                text = subText,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 42.dp, top = 2.dp)
+            )
+        }
     }
 }
+
 
 @Composable
 private fun EditProfileOverlay(
