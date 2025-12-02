@@ -2,6 +2,8 @@ package ca.qolt.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import ca.qolt.data.local.dao.UsageSessionDao
+import ca.qolt.ui.statistics.TestDataGenerator
 import ca.qolt.ui.statistics.WidgetPresetManager
 import dagger.Module
 import dagger.Provides
@@ -19,6 +21,14 @@ object StatisticsModule {
         dataStore: DataStore<Preferences>
     ): WidgetPresetManager {
         return WidgetPresetManager(dataStore)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideTestDataGenerator(
+        usageSessionDao: UsageSessionDao
+    ): TestDataGenerator {
+        return TestDataGenerator(usageSessionDao)
     }
 }
 

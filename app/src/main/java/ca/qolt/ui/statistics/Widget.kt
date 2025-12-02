@@ -45,20 +45,12 @@ sealed class WidgetType {
         val period: String = "all time"
     ) : WidgetType()
     
-    data class CircularProgress(
-        override val id: String = "circular_progress",
-        override val title: String = "Progress",
-        val current: Float,
-        val total: Float,
-        val percentage: Int
-    ) : WidgetType()
-    
-    data class BarChart(
-        override val id: String = "bar_chart",
-        override val title: String = "Activity",
-        val dataPoints: List<Float>,
-        val labels: List<String>,
-        val period: String = "Last 7 days"
+    data class MonthlyOverview(
+        override val id: String = "monthly_overview",
+        override val title: String = "Monthly Overview",
+        val totalHours: Float,
+        val weeklyData: List<Float>, // 4 weeks of data
+        val weekLabels: List<String> = listOf("W1", "W2", "W3", "W4")
     ) : WidgetType()
     
     data class StatsToday(
@@ -76,6 +68,15 @@ sealed class WidgetType {
         val targetProgress: Int,
         val completedDays: List<Boolean>, // 7 booleans for days of week
         val period: String = "this week"
+    ) : WidgetType()
+    
+    data class FocusTimeToday(
+        override val id: String = "focus_time_today",
+        override val title: String = "Focus Time Today",
+        val todayHours: Float,
+        val vsAverage: Float, // Difference vs average (e.g., +1.2h)
+        val weeklyData: List<Float>, // 7 data points for Mon-Sun
+        val dayLabels: List<String> = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     ) : WidgetType()
 }
 
