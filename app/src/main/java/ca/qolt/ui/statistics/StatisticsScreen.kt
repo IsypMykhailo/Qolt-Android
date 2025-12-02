@@ -24,6 +24,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.scale
 
 @Composable
 fun Statistics(
@@ -180,6 +184,13 @@ fun StatisticsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
+            // Animation visibility state
+            var isVisible by remember { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                isVisible = true
+            }
+
             // Helper function to check if a widget is narrow (should be placed side by side)
             fun isNarrowWidget(widget: Widget): Boolean {
                 return widget.type is WidgetType.Streak || widget.type is WidgetType.WeeklyGoal
@@ -197,12 +208,25 @@ fun StatisticsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-                // STREAKS Section
+                // STREAKS Section with animation
                 item {
-                    SectionHeader(
-                        title = "STREAKS",
-                        onMoreClick = { toggleCustomizeDialog() }
-                    )
+                    AnimatedVisibility(
+                        visible = isVisible,
+                        enter = fadeIn(
+                            animationSpec = tween(400, delayMillis = 50)
+                        ) + slideInVertically(
+                            initialOffsetY = { it / 3 },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        )
+                    ) {
+                        SectionHeader(
+                            title = "STREAKS",
+                            onMoreClick = { toggleCustomizeDialog() }
+                        )
+                    }
                 }
 
                 // Render widgets with smart grouping
@@ -218,6 +242,7 @@ fun StatisticsScreen(
                 }  else {
                     // Group widgets: collect consecutive narrow widgets into rows
                     var i = 0
+                    var itemIndex = 0 // Track item index for staggered animation
                     while (i < widgetsToDisplay.size) {
                         val currentWidget = widgetsToDisplay[i]
 
@@ -229,25 +254,55 @@ fun StatisticsScreen(
                                 i++
                             }
 
-                            // Render narrow widgets in a row
+                            // Render narrow widgets in a row with animation
+                            val currentItemIndex = itemIndex
                             item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                AnimatedVisibility(
+                                    visible = isVisible,
+                                    enter = fadeIn(
+                                        animationSpec = tween(400, delayMillis = 100 + currentItemIndex * 50)
+                                    ) + slideInVertically(
+                                        initialOffsetY = { it / 3 },
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    )
                                 ) {
-                                    narrowWidgets.forEach { widget ->
-                                        Box(modifier = Modifier.weight(1f)) {
-                                            WidgetRenderer(widget = widget)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        narrowWidgets.forEach { widget ->
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                WidgetRenderer(widget = widget)
+                                            }
                                         }
                                     }
                                 }
                             }
+                            itemIndex++
                         } else {
-                            // Render full-width widget
+                            // Render full-width widget with animation
+                            val currentItemIndex = itemIndex
                             item {
-                                WidgetRenderer(widget = currentWidget)
+                                AnimatedVisibility(
+                                    visible = isVisible,
+                                    enter = fadeIn(
+                                        animationSpec = tween(400, delayMillis = 100 + currentItemIndex * 50)
+                                    ) + slideInVertically(
+                                        initialOffsetY = { it / 3 },
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    )
+                                ) {
+                                    WidgetRenderer(widget = currentWidget)
+                                }
                             }
                             i++
+                            itemIndex++
                         }
                     }
                 }
@@ -299,7 +354,7 @@ private fun DurationSelectorCompact(
 ) {
     val outerHeight = 40.dp // ~40dp height
     val outerRadius = 20.dp // Border radius: 20 (or could use 999 for perfect capsule)
-    
+
     // Very light grey pill-shaped container with inner padding
     Box(
         modifier = modifier
@@ -313,10 +368,40 @@ private fun DurationSelectorCompact(
         ) {
             Duration.values().forEachIndexed { index, duration ->
                 val isSelected = selectedDuration == duration
-                
+
+                // Animate scale for selected pill
+                val scale by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0.98f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "durationScale"
+                )
+
+                // Animate background color
+                val backgroundColor by animateColorAsState(
+                    targetValue = if (isSelected) StatisticsColors.Orange else Color.Transparent,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "durationBackgroundColor"
+                )
+
+                // Animate text color
+                val textColor by animateColorAsState(
+                    targetValue = if (isSelected) Color(0xFF000000) else Color(0xFF8A8A8A),
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "durationTextColor"
+                )
+
                 // Orange pill shape - perfect capsule with 999 radius
                 val orangePillShape = RoundedCornerShape(999.dp) // Perfect capsule
-                
+
                 // Segment container with margins for orange pill
                 Box(
                     modifier = Modifier
@@ -326,13 +411,8 @@ private fun DurationSelectorCompact(
                             horizontal = 5.dp, // 4-6px horizontal margin
                             vertical = 4.dp // 4px vertical margin
                         )
-                        .then(
-                            if (isSelected) {
-                                Modifier.background(StatisticsColors.Orange, orangePillShape)
-                            } else {
-                                Modifier
-                            }
-                        )
+                        .scale(scale)
+                        .background(backgroundColor, orangePillShape)
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -360,11 +440,7 @@ private fun DurationSelectorCompact(
                                         FontWeight.Normal
                                     }
                                 ),
-                                color = if (isSelected) {
-                                    Color(0xFF000000) // Black bold text on orange background
-                                } else {
-                                    Color(0xFF8A8A8A) // Medium/light grey for unselected
-                                },
+                                color = textColor,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -407,43 +483,68 @@ private fun SearchDialog(
     onSearchQueryChange: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // Animation state for dialog entrance
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(
-                containerColor = StatisticsColors.CardBackground
-            )
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(300)) +
+                    slideInVertically(
+                        initialOffsetY = { it / 2 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + scaleIn(
+                        initialScale = 0.9f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ),
+            exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.95f)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = StatisticsColors.CardBackground
+                )
             ) {
-                Text(
-                    text = "Search Statistics",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
-                )
-                
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    label = { Text("Search...") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Close", color = StatisticsColors.Orange)
+                    Text(
+                        text = "Search Statistics",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        label = { Text("Search...") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Close", color = StatisticsColors.Orange)
+                        }
                     }
                 }
             }
@@ -457,14 +558,33 @@ private fun FilterDialog(
     onDismiss: () -> Unit,
     onFiltersChange: (StatisticsFilters) -> Unit
 ) {
+    // Animation state for slide-up entrance
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
     Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.8f),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            color = StatisticsColors.CardBackground
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(300)) +
+                    slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ),
+            exit = fadeOut(animationSpec = tween(200)) +
+                    slideOutVertically(targetOffsetY = { it })
         ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.8f),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                color = StatisticsColors.CardBackground
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -523,6 +643,7 @@ private fun FilterDialog(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -542,16 +663,40 @@ private fun CustomizeDialog(
     val currentWidgetIds = widgets.map { it.type.id }.toSet()
     val availableToAdd = availableWidgetTypes.filter { it.id !in currentWidgetIds }
 
+    // Animation state for dialog entrance
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(
-                containerColor = StatisticsColors.CardBackground
-            )
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(300)) +
+                    slideInVertically(
+                        initialOffsetY = { it / 2 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + scaleIn(
+                        initialScale = 0.9f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ),
+            exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.95f)
         ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = StatisticsColors.CardBackground
+                )
+            ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -689,6 +834,7 @@ private fun CustomizeDialog(
                         Text("Save", color = Color.White)
                     }
                 }
+            }
             }
         }
     }

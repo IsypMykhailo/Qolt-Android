@@ -65,6 +65,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.core.*
+import androidx.compose.animation.*
+import androidx.compose.ui.draw.scale
 
 
 @Composable
@@ -114,6 +117,13 @@ fun ProfileScreen(
 
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    // Animation visibility state
+    var isVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
 
     val profileImageUri: Uri? = remember(state.profileImageUri) {
         state.profileImageUri?.let { Uri.parse(it) }
@@ -260,17 +270,36 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Profile section with animation
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = fadeIn(
+                        animationSpec = tween(400, delayMillis = 100)
+                    ) + slideInVertically(
+                        initialOffsetY = { it / 3 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    ) + scaleIn(
+                        initialScale = 0.9f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(96.dp)
-                            .clip(CircleShape)
-                            .border(3.dp, orange, CircleShape),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .clip(CircleShape)
+                                .border(3.dp, orange, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
                         if (profileImageUri != null) {
                             AsyncImage(
                                 model = profileImageUri,
@@ -322,14 +351,15 @@ fun ProfileScreen(
                         color = Color(0xFFB0B0B0),
                         fontSize = 13.sp
                     )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Settings list
+                // Settings list with staggered animations
                 var lastSection = ""
 
-                visibleSettings.forEach { (setting, section) ->
+                visibleSettings.forEachIndexed { index, (setting, section) ->
                     if (section != lastSection && section != "OTHER") {
                         Text(
                             text = section,
@@ -341,7 +371,20 @@ fun ProfileScreen(
                         lastSection = section
                     }
 
-                    when (setting) {
+                    // Staggered animation for each setting
+                    AnimatedVisibility(
+                        visible = isVisible,
+                        enter = fadeIn(
+                            animationSpec = tween(400, delayMillis = 200 + index * 50)
+                        ) + slideInVertically(
+                            initialOffsetY = { it / 4 },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        )
+                    ) {
+                        when (setting) {
                         "Block Timer" -> SettingToggleRow(
                             icon = { Icon(Icons.Outlined.Schedule, null, tint = Color.White) },
                             label = "Block Timer",
@@ -461,6 +504,7 @@ fun ProfileScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
+                        }
                     }
                 }
 
@@ -526,16 +570,38 @@ private fun SettingToggleRow(
     orange: Color,
     subText: String? = null
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    // Animate icon scale based on toggle state
+    val iconScale by animateFloatAsState(
+        targetValue = if (checked) 1.1f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "iconScale"
+    )
 
+    // Animate row scale on interaction
+    val rowScale by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "rowScale"
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .scale(rowScale)
                 .padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier
+                    .size(28.dp)
+                    .scale(iconScale),
                 contentAlignment = Alignment.Center
             ) {
                 icon()
@@ -584,18 +650,39 @@ fun SettingRow(
     trailingContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
+    // Scale animation for interaction feedback
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "settingRowScale"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .scale(scale)
+            .clickable {
+                isPressed = true
+                onClick()
+            }
             .padding(vertical = 6.dp)
     ) {
+        // Reset pressed state after animation
+        LaunchedEffect(isPressed) {
+            if (isPressed) {
+                kotlinx.coroutines.delay(100)
+                isPressed = false
+            }
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-
             Box(
                 modifier = Modifier.size(28.dp),
                 contentAlignment = Alignment.Center
@@ -646,6 +733,12 @@ private fun EditProfileOverlay(
         mutableStateOf(currentImageUri)
     }
 
+    // Animation state for dialog entrance
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
     val pickImageLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
@@ -660,18 +753,31 @@ private fun EditProfileOverlay(
             }
         }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(top = 65.dp),
-        contentAlignment = Alignment.Center
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(300)) +
+                scaleIn(
+                    initialScale = 0.9f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                ),
+        exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.95f)
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .padding(top = 65.dp),
+            contentAlignment = Alignment.Center
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(Color(0xFF2C2C2E))
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -803,6 +909,7 @@ private fun EditProfileOverlay(
                 }
 
                 Spacer(modifier = Modifier.height(100.dp))
+            }
             }
         }
     }
@@ -941,36 +1048,61 @@ fun LogoutConfirmationDialog(
     onConfirm: () -> Unit,
     onCancel: () -> Unit
 ) {
-    Box(modifier = Modifier
-        .fillMaxSize()) {
+    // Animation state for dialog entrance
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(20.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 150.dp)
-                .align(Alignment.BottomCenter)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Background overlay with fade-in
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200))
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
 
-            Column(
+        // Dialog content with slide-up animation
+        AnimatedVisibility(
+            visible = visible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(
+                initialOffsetY = { it / 2 },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            ) + fadeIn(animationSpec = tween(300)) +
+                    scaleIn(
+                        initialScale = 0.9f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ),
+            exit = slideOutVertically(targetOffsetY = { it / 2 }) +
+                    fadeOut(animationSpec = tween(200)) +
+                    scaleOut(targetScale = 0.95f)
+        ) {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(horizontal = 24.dp, vertical = 150.dp)
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 Text(
                     text = "Are you sure you want to log out?",
                     fontSize = 16.sp,
@@ -1016,9 +1148,8 @@ fun LogoutConfirmationDialog(
                     )
                 }
             }
+            }
         }
-
-
     }
 }
 
@@ -1037,20 +1168,51 @@ fun LanguageSelectionDialog(
         "中文" to ca.qolt.R.drawable.flag_china,
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        )
+    // Animation state for slide-up entrance
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.92f)
-                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 24.dp, vertical = 22.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Semi-transparent background with fade-in animation
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200))
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable(onClick = onDismiss)
+            )
+        }
+
+        // Dialog content with slide-up animation
+        AnimatedVisibility(
+            visible = visible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            ) + fadeIn(animationSpec = tween(300)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(200)
+            ) + fadeOut(animationSpec = tween(200))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.92f)
+                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .background(Color(0xFF1C1C1E))
+                    .padding(horizontal = 24.dp, vertical = 22.dp)
+            ) {
 
             Box(
                 modifier = Modifier
@@ -1163,6 +1325,7 @@ fun LanguageSelectionDialog(
                         )
                     }
                 }
+            }
             }
         }
     }
