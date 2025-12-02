@@ -11,9 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,14 +20,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
-import androidx.hilt.navigation.compose.hiltViewModel
-import ca.qolt.ui.statistics.StatisticsColors
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatisticsScreen(
-    viewModel: StatisticsViewModel = hiltViewModel()
+fun Statistics(
+    modifier: Modifier = Modifier,
+    viewModel: StatisticsViewModel
 ) {
     val widgets by viewModel.widgets.collectAsState()
     val isEditMode by viewModel.isEditMode.collectAsState()
@@ -38,7 +36,54 @@ fun StatisticsScreen(
     val showFilterDialog by viewModel.showFilterDialog.collectAsState()
     val showSearchDialog by viewModel.showSearchDialog.collectAsState()
     val showCustomizeDialog by viewModel.showCustomizeDialog.collectAsState()
-    
+    StatisticsScreen(
+        modifier = modifier,
+        widgets,
+        isEditMode,
+        filters,
+        showFilterDialog,
+        showSearchDialog,
+        showCustomizeDialog,
+        viewModel::toggleSearchDialog,
+        viewModel::toggleFilterDialog,
+        viewModel::toggleCustomizeDialog,
+        viewModel::setDuration,
+        viewModel::setSearchQuery,
+        viewModel::updateFilters,
+        viewModel::moveWidgetUp,
+        viewModel::moveWidgetDown,
+        viewModel::removeWidget,
+        viewModel::savePreset,
+        viewModel::generateTestData,
+        viewModel::getAllAvailableWidgetTypes,
+        viewModel::addWidget
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatisticsScreen(
+    modifier: Modifier = Modifier,
+    widgets: List<Widget>,
+    isEditMode: Boolean,
+    filters: StatisticsFilters,
+    showFilterDialog: Boolean,
+    showSearchDialog: Boolean,
+    showCustomizeDialog: Boolean,
+    toggleSearchDialog: () -> Unit,
+    toggleFilterDialog: () -> Unit,
+    toggleCustomizeDialog: () -> Unit,
+    setDuration: (Duration) -> Unit,
+    setSearchQuery: (String) -> Unit,
+    updateFilters: (StatisticsFilters) -> Unit,
+    moveWidgetUp: (Int) -> Unit,
+    moveWidgetDown: (Int) -> Unit,
+    removeWidget: (Int) -> Unit,
+    savePreset: () -> Unit,
+    generateTestData: () -> Unit,
+    getAllAvailableWidgetTypes: () -> List<WidgetType>,
+    addWidget: (WidgetType) -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -67,7 +112,7 @@ fun StatisticsScreen(
                         .align(Alignment.CenterStart)
                         .size(48.dp) // Increased from 40dp for chunkier feel
                         .background(Color.White, CircleShape)
-                        .clickable { viewModel.toggleSearchDialog() },
+                        .clickable { toggleSearchDialog() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -86,7 +131,7 @@ fun StatisticsScreen(
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.align(Alignment.Center)
                 )
-                
+
                 // Right: Orange circular filter button
                 Row(
                     modifier = Modifier.align(Alignment.CenterEnd),
@@ -97,7 +142,7 @@ fun StatisticsScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .background(Color(0xFF4CAF50), CircleShape)
-                            .clickable { viewModel.generateTestData() },
+                            .clickable { generateTestData() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -107,12 +152,12 @@ fun StatisticsScreen(
                             modifier = Modifier.size(22.dp)
                         )
                     }
-                    
+
                     Box(
                         modifier = Modifier
                             .size(48.dp) // Increased from 40dp for chunkier feel
                             .background(StatisticsColors.Orange, CircleShape)
-                            .clickable { viewModel.toggleFilterDialog() },
+                            .clickable { toggleFilterDialog() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -129,23 +174,23 @@ fun StatisticsScreen(
         // Duration Selector (1 Day, 7 Days, 30 Days) - matching screenshot
         DurationSelectorCompact(
             selectedDuration = filters.duration,
-            onDurationSelected = { viewModel.setDuration(it) },
+            onDurationSelected = { setDuration(it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        
-        // Helper function to check if a widget is narrow (should be placed side by side)
-        fun isNarrowWidget(widget: Widget): Boolean {
-            return widget.type is WidgetType.Streak || widget.type is WidgetType.WeeklyGoal
-        }
-        
-        // Display widgets in their actual order (sorted by position)
-        val widgetsToDisplay = if (widgets.isEmpty()) {
-            emptyList()
-        } else {
-            widgets.sortedBy { it.position }
-        }
+
+            // Helper function to check if a widget is narrow (should be placed side by side)
+            fun isNarrowWidget(widget: Widget): Boolean {
+                return widget.type is WidgetType.Streak || widget.type is WidgetType.WeeklyGoal
+            }
+
+            // Display widgets in their actual order (sorted by position)
+            val widgetsToDisplay = if (widgets.isEmpty()) {
+                emptyList()
+            } else {
+                widgets.sortedBy { it.position }
+            }
         
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -156,10 +201,10 @@ fun StatisticsScreen(
                 item {
                     SectionHeader(
                         title = "STREAKS",
-                        onMoreClick = { viewModel.toggleCustomizeDialog() }
+                        onMoreClick = { toggleCustomizeDialog() }
                     )
                 }
-                
+
                 // Render widgets with smart grouping
                 if (widgetsToDisplay.isEmpty()) {
                     // Show loading or empty state
@@ -170,12 +215,12 @@ fun StatisticsScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     }
-                } else {
+                }  else {
                     // Group widgets: collect consecutive narrow widgets into rows
                     var i = 0
                     while (i < widgetsToDisplay.size) {
                         val currentWidget = widgetsToDisplay[i]
-                        
+
                         if (isNarrowWidget(currentWidget)) {
                             // Collect consecutive narrow widgets
                             val narrowWidgets = mutableListOf<Widget>()
@@ -183,7 +228,7 @@ fun StatisticsScreen(
                                 narrowWidgets.add(widgetsToDisplay[i])
                                 i++
                             }
-                            
+
                             // Render narrow widgets in a row
                             item {
                                 Row(
@@ -213,8 +258,8 @@ fun StatisticsScreen(
         if (showSearchDialog) {
             SearchDialog(
                 searchQuery = filters.searchQuery,
-                onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                onDismiss = { viewModel.toggleSearchDialog() }
+                onSearchQueryChange = { setSearchQuery(it) },
+                onDismiss = { toggleSearchDialog() }
             )
         }
         
@@ -222,8 +267,8 @@ fun StatisticsScreen(
         if (showFilterDialog) {
             FilterDialog(
                 filters = filters,
-                onDismiss = { viewModel.toggleFilterDialog() },
-                onFiltersChange = { viewModel.updateFilters(it) }
+                onDismiss = { toggleFilterDialog() },
+                onFiltersChange = { updateFilters(it) }
             )
         }
         
@@ -231,15 +276,15 @@ fun StatisticsScreen(
         if (showCustomizeDialog) {
             CustomizeDialog(
                 widgets = widgets,
-                availableWidgetTypes = viewModel.getAllAvailableWidgetTypes(),
-                onDismiss = { viewModel.toggleCustomizeDialog() },
-                onMoveUp = { viewModel.moveWidgetUp(it) },
-                onMoveDown = { viewModel.moveWidgetDown(it) },
-                onRemove = { viewModel.removeWidget(it) },
-                onAdd = { viewModel.addWidget(it) },
+                availableWidgetTypes = getAllAvailableWidgetTypes(),
+                onDismiss = { toggleCustomizeDialog() },
+                onMoveUp = { moveWidgetUp(it) },
+                onMoveDown = { moveWidgetDown(it) },
+                onRemove = { removeWidget(it) },
+                onAdd = { addWidget(it) },
                 onSave = { 
-                    viewModel.savePreset()
-                    viewModel.toggleCustomizeDialog()
+                    savePreset()
+                    toggleCustomizeDialog()
                 }
             )
         }
@@ -442,7 +487,7 @@ private fun FilterDialog(
                         color = Color.White,
                         modifier = Modifier.padding(bottom = 28.dp)
                     )
-                    
+
                     // Filter controls
                     FilterControls(
                         filters = filters,
@@ -451,7 +496,7 @@ private fun FilterDialog(
                         onDateChange = { onFiltersChange(filters.copy(selectedDate = it)) }
                     )
                 }
-                
+
                 // Done button
                 Row(
                     modifier = Modifier
@@ -496,7 +541,7 @@ private fun CustomizeDialog(
     var showAddWidgets by remember { mutableStateOf(false) }
     val currentWidgetIds = widgets.map { it.type.id }.toSet()
     val availableToAdd = availableWidgetTypes.filter { it.id !in currentWidgetIds }
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -531,7 +576,7 @@ private fun CustomizeDialog(
                         }
                     }
                 }
-                
+
                 if (showAddWidgets) {
                     // Show available widgets to add
                     LazyColumn(
@@ -590,7 +635,7 @@ private fun CustomizeDialog(
                                     color = Color.White,
                                     modifier = Modifier.weight(1f)
                                 )
-                                
+
                                 Row {
                                     IconButton(
                                         onClick = { onMoveUp(index) },
@@ -602,7 +647,7 @@ private fun CustomizeDialog(
                                             tint = if (index > 0) StatisticsColors.Orange else Color(0xFF424242)
                                         )
                                     }
-                                    
+
                                     IconButton(
                                         onClick = { onMoveDown(index) },
                                         enabled = index < widgets.size - 1
@@ -613,7 +658,7 @@ private fun CustomizeDialog(
                                             tint = if (index < widgets.size - 1) StatisticsColors.Orange else Color(0xFF424242)
                                         )
                                     }
-                                    
+
                                     IconButton(onClick = { onRemove(index) }) {
                                         Icon(
                                             Icons.Default.Delete,
@@ -626,7 +671,7 @@ private fun CustomizeDialog(
                         }
                     }
                 }
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End

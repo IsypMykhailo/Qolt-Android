@@ -15,6 +15,10 @@ class StatisticsViewModel @Inject constructor(
     private val statisticsRepository: StatisticsRepository,
     private val testDataGenerator: TestDataGenerator
 ) : ViewModel() {
+
+    companion object {
+        const val TAG = "StatisticsViewModel"
+    }
     
     private val _filters = MutableStateFlow(StatisticsFilters())
     val filters: StateFlow<StatisticsFilters> = _filters.asStateFlow()
