@@ -8,10 +8,12 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 
+/**
+ * Utility object for managing app blocking permissions.
+ * Note: Actual app blocking logic has been moved to AppBlockingRepository.
+ * This object now only handles permission checks and requests.
+ */
 object AppBlockingManager {
-    private const val PREFS_NAME = "app_blocking_prefs"
-    private const val KEY_BLOCKED_APPS = "blocked_apps"
-    private const val KEY_BLOCKING_ACTIVE = "blocking_active"
 
     fun hasUsageStatsPermission(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
@@ -55,49 +57,5 @@ object AppBlockingManager {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
         }
-    }
-
-    fun saveBlockedApps(context: Context, packageNames: Set<String>) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putStringSet(KEY_BLOCKED_APPS, packageNames).apply()
-    }
-
-    fun getBlockedApps(context: Context): Set<String> {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getStringSet(KEY_BLOCKED_APPS, emptySet()) ?: emptySet()
-    }
-
-    fun setBlockingActive(context: Context, active: Boolean) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_BLOCKING_ACTIVE, active).apply()
-    }
-
-    fun isBlockingActive(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_BLOCKING_ACTIVE, false)
-    }
-
-    fun blockApps(context: Context, packageNames: Set<String>) {
-        if (!hasUsageStatsPermission(context)) {
-            return
-        }
-
-        saveBlockedApps(context, packageNames)
-        setBlockingActive(context, true)
-
-        val intent = Intent(context, AppBlockingService::class.java)
-        intent.putStringArrayListExtra("blocked_apps", ArrayList(packageNames))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
-    }
-
-    fun unblockApps(context: Context) {
-        setBlockingActive(context, false)
-
-        val intent = Intent(context, AppBlockingService::class.java)
-        context.stopService(intent)
     }
 }

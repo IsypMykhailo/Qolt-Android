@@ -1,7 +1,6 @@
 package ca.qolt.data.repository
 
 import android.content.Context
-import ca.qolt.services.AppBlockingManager
 import ca.qolt.data.local.SessionManager
 import ca.qolt.data.local.dao.UsageSessionDao
 import ca.qolt.data.local.entity.UsageSessionEntity
@@ -24,6 +23,7 @@ interface UsageSessionRepository {
 class UsageSessionRepositoryImpl @Inject constructor(
     private val usageSessionDao: UsageSessionDao,
     private val sessionManager: SessionManager,
+    private val appBlockingRepository: AppBlockingRepository,
     @ApplicationContext private val context: Context
 ) : UsageSessionRepository {
 
@@ -128,7 +128,7 @@ class UsageSessionRepositoryImpl @Inject constructor(
         val activeSession = usageSessionDao.getActiveSession()
 
         if (activeSession != null) {
-            val isStillBlocking = AppBlockingManager.isBlockingActive(context)
+            val isStillBlocking = appBlockingRepository.isBlockingActive()
 
             if (!isStillBlocking) {
                 // Session should have ended but didn't (probably crash/force stop)

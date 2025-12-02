@@ -71,7 +71,11 @@ fun NavGraph(
         ) {
             composable(Destination.Main.Home.route) {
                 val viewModel: HomeViewModel = hiltViewModel(key = HomeViewModel.TAG)
-                Home(modifier, viewModel)
+                Home(
+                    modifier = modifier,
+                    viewModel = viewModel,
+                    onNavigateToPresets = { navController.navigate(Destination.Main.Blocks.route) }
+                )
             }
             composable(Destination.Main.Blocks.route) {
                 val viewModel: PresetsViewModel = hiltViewModel(key = PresetsViewModel.TAG)

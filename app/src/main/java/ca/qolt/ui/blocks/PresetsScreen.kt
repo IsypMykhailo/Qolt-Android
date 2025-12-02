@@ -5,9 +5,24 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,24 +32,42 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +77,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -59,6 +95,7 @@ import androidx.core.graphics.createBitmap
 import ca.qolt.R
 import ca.qolt.data.local.entity.PresetEntity
 import ca.qolt.model.InstalledApp
+import ca.qolt.ui.theme.Orange
 import java.util.UUID
 
 @Composable
@@ -102,8 +139,12 @@ fun PresetsScreen(
 ) {
     var editingPreset by remember { mutableStateOf<PresetEntity?>(null) }
     var isCreatingNew by remember { mutableStateOf(false) }
-
     var menuExpandedForId by remember { mutableStateOf<String?>(null) }
+    var isVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
 
     val currentPreset = remember(presets, currentPresetId) {
         presets.firstOrNull { it.id == currentPresetId }
@@ -118,12 +159,32 @@ fun PresetsScreen(
 
     val scrollState = rememberScrollState()
 
+    // Animated FAB scale
+    val fabScale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "fabScale"
+    )
+
+    val topBarOffset by animateDpAsState(
+        targetValue = if (isVisible) 0.dp else (-50).dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "topBarOffset"
+    )
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF1C1C1E))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         if (presets.isEmpty()) {
+            // Empty State with animations
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -132,41 +193,52 @@ fun PresetsScreen(
             ) {
                 Text(
                     text = "Blocks",
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(if (isVisible) 1f else 0f),
                     textAlign = TextAlign.Center,
-                    style = TextStyle(
-                        color = Color.White,
-                        fontSize = 26.sp,
+                    style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 )
 
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        Text(
-                            text = "You don't have any blocks yet",
-                            style = TextStyle(
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isVisible,
+                        enter = fadeIn(animationSpec = tween(600)) + scaleIn(
+                            initialScale = 0.8f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
                             )
                         )
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(80.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            )
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    color = Color(0xFFFF4400),
-                                    shape = RoundedCornerShape(48.dp)
+                            Text(
+                                text = "You don't have any blocks yet",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = MaterialTheme.colorScheme.onBackground
                                 )
-                                .clickable {
+                            )
+
+                            FilledTonalButton(
+                                onClick = {
                                     isCreatingNew = true
                                     editingPreset = PresetEntity(
                                         id = UUID.randomUUID().toString(),
@@ -174,18 +246,28 @@ fun PresetsScreen(
                                         description = "",
                                         blockedApps = emptyList()
                                     )
+                                },
+                                modifier = Modifier.padding(top = 8.dp),
+                                shape = RoundedCornerShape(24.dp)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Create Your First Block",
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
                                 }
-                                .padding(horizontal = 8.dp, vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Create Your First Block",
-                                style = TextStyle(
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            )
+                            }
                         }
                     }
                 }
@@ -198,132 +280,158 @@ fun PresetsScreen(
                     .padding(horizontal = 24.dp, vertical = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
             ) {
+                // Top Bar with animations
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = topBarOffset),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .background(
-                                color = Color(0xFFFDFDFD),
-                                shape = RoundedCornerShape(100)
-                            )
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(
-                            0.dp,
-                            Alignment.CenterVertically
-                        ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    // Search icon (placeholder)
+                    Surface(
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shadowElevation = 2.dp,
+                        tonalElevation = 2.dp
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_search),
-                            contentDescription = "search",
-                            contentScale = ContentScale.None,
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
+
                     Text(
                         text = "Blocks",
-                        style = TextStyle(
-                            color = Color.White,
-                            fontSize = 26.sp,
+                        style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                     )
-                    Column(
-                        modifier = Modifier
-                            .background(
-                                color = Color(0xFFFF4400),
-                                shape = RoundedCornerShape(100)
+
+                    // Add button with animation
+                    FloatingActionButton(
+                        onClick = {
+                            isCreatingNew = true
+                            editingPreset = PresetEntity(
+                                id = UUID.randomUUID().toString(),
+                                name = "",
+                                description = "",
+                                blockedApps = emptyList()
                             )
-                            .padding(16.dp)
-                            .clickable {
-                                isCreatingNew = true
-                                editingPreset = PresetEntity(
-                                    id = UUID.randomUUID().toString(),
-                                    name = "",
-                                    description = "",
-                                    blockedApps = emptyList()
-                                )
-                            },
-                        verticalArrangement = Arrangement.spacedBy(
-                            0.dp,
-                            Alignment.CenterVertically
-                        ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .scale(fabScale),
+                        containerColor = Orange,
+                        shape = CircleShape,
+                        elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 8.dp
+                        )
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_add),
-                            contentDescription = "add",
-                            contentScale = ContentScale.None,
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add preset",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
 
+                // Presets List with animations
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top)
                 ) {
-                    if (currentPreset != null) {
-                        Text(
-                            text = "CURRENT",
-                            style = TextStyle(
-                                color = Color(0xFFFDFDFD),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Light
-                            )
-                        )
-                        PresetRow(
-                            preset = currentPreset,
-                            isCurrent = true,
-                            menuExpandedForId = menuExpandedForId,
-                            onMenuExpandedChange = { menuExpandedForId = it },
-                            onSetCurrent = { setCurrentPresetId(currentPreset.id) },
-                            onEdit = {
-                                isCreatingNew = false
-                                editingPreset = currentPreset
-                            },
-                            onDelete = { onDeletePreset(currentPreset) }
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        if (recentPresets.isNotEmpty()) {
+                    AnimatedVisibility(
+                        visible = currentPreset != null,
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }),
+                        exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 2 })
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
-                                text = "RECENT",
-                                style = TextStyle(
-                                    color = Color(0xFFFDFDFD),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Light
+                                text = "CURRENT",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                    letterSpacing = 1.2.sp
                                 )
                             )
+                            currentPreset?.let { preset ->
+                                PresetRow(
+                                    preset = preset,
+                                    isCurrent = true,
+                                    menuExpandedForId = menuExpandedForId,
+                                    onMenuExpandedChange = { menuExpandedForId = it },
+                                    onSetCurrent = { setCurrentPresetId(preset.id) },
+                                    onEdit = {
+                                        isCreatingNew = false
+                                        editingPreset = preset
+                                    },
+                                    onDelete = { onDeletePreset(preset) },
+                                    isVisible = isVisible
+                                )
+                            }
                         }
-                    } else {
-                        Text(
-                            text = "RECENT",
-                            style = TextStyle(
-                                color = Color(0xFFFDFDFD),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Light
-                            )
-                        )
                     }
 
-                    recentPresets.forEach { preset ->
-                        PresetRow(
-                            preset = preset,
-                            isCurrent = false,
-                            menuExpandedForId = menuExpandedForId,
-                            onMenuExpandedChange = { menuExpandedForId = it },
-                            onSetCurrent = { setCurrentPresetId(preset.id) },
-                            onEdit = {
-                                isCreatingNew = false
-                                editingPreset = preset
-                            },
-                            onDelete = { onDeletePreset(preset) }
-                        )
+                    AnimatedVisibility(
+                        visible = recentPresets.isNotEmpty(),
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = if (currentPreset != null) "RECENT" else "ALL PRESETS",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                    letterSpacing = 1.2.sp
+                                )
+                            )
+
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                recentPresets.forEachIndexed { index, preset ->
+                                    AnimatedVisibility(
+                                        visible = isVisible,
+                                        enter = fadeIn(
+                                            animationSpec = tween(
+                                                durationMillis = 400,
+                                                delayMillis = index * 50
+                                            )
+                                        ) + slideInVertically(
+                                            initialOffsetY = { it / 3 },
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            )
+                                        )
+                                    ) {
+                                        PresetRow(
+                                            preset = preset,
+                                            isCurrent = false,
+                                            menuExpandedForId = menuExpandedForId,
+                                            onMenuExpandedChange = { menuExpandedForId = it },
+                                            onSetCurrent = { setCurrentPresetId(preset.id) },
+                                            onEdit = {
+                                                isCreatingNew = false
+                                                editingPreset = preset
+                                            },
+                                            onDelete = { onDeletePreset(preset) },
+                                            isVisible = true
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
 
@@ -355,93 +463,219 @@ private fun PresetRow(
     onMenuExpandedChange: (String?) -> Unit,
     onSetCurrent: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isVisible: Boolean
 ) {
-    Row(
+    val scale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0.95f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "presetScale"
+    )
+
+    val elevation by animateDpAsState(
+        targetValue = if (isCurrent) 4.dp else 2.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "presetElevation"
+    )
+
+    val cardColor by animateColorAsState(
+        targetValue = if (isCurrent) Orange else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "cardColor"
+    )
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                color = Color(0xFFFF4400),
-                shape = RoundedCornerShape(48.dp)
-            )
-            .clickable {
-                onMenuExpandedChange(preset.id)
-            }
-            .padding(vertical = 16.dp, horizontal = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .scale(scale)
+            .animateContentSize(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
     ) {
-        Text(
-            text = preset.emoji,
-            style = TextStyle(
-                fontSize = 22.sp
-            )
-        )
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = preset.name.ifBlank { "Untitled preset" },
-                style = TextStyle(
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            )
-            if (preset.description.isNotBlank()) {
-                Text(
-                    text = preset.description,
-                    style = TextStyle(
-                        color = Color(0xFFFFEDE3),
-                        fontSize = 13.sp
-                    )
-                )
-            }
-        }
-
-        Box {
-            IconButton(
-                onClick = {
-                    onMenuExpandedChange(preset.id)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = Color.White.copy(alpha = 0.2f))
+                ) {
+                    if (!isCurrent) onSetCurrent()
                 }
+                .padding(vertical = 16.dp, horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Emoji with scale animation
+            val emojiScale by animateFloatAsState(
+                targetValue = if (isCurrent) 1.1f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                ),
+                label = "emojiScale"
+            )
+
+            Text(
+                text = preset.emoji,
+                style = TextStyle(fontSize = 28.sp),
+                modifier = Modifier.scale(emojiScale)
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.MoreHoriz,
-                    contentDescription = "Preset options",
-                    tint = Color.White
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = preset.name.ifBlank { "Untitled preset" },
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = if (isCurrent) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                    if (isCurrent) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.padding(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Current",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .padding(2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "${preset.blockedApps.size} ${if (preset.blockedApps.size == 1) "app" else "apps"}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = if (isCurrent)
+                                Color.White.copy(alpha = 0.8f)
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    )
+                    if (preset.description.isNotBlank()) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = if (isCurrent)
+                                    Color.White.copy(alpha = 0.6f)
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        )
+                        Text(
+                            text = preset.description,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = if (isCurrent)
+                                    Color.White.copy(alpha = 0.8f)
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        )
+                    }
+                }
             }
 
-            DropdownMenu(
-                expanded = menuExpandedForId == preset.id,
-                onDismissRequest = { onMenuExpandedChange(null) }
-            ) {
-                if (!isCurrent) {
+            Box {
+                IconButton(
+                    onClick = { onMenuExpandedChange(preset.id) }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Preset options",
+                        tint = if (isCurrent) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = menuExpandedForId == preset.id,
+                    onDismissRequest = { onMenuExpandedChange(null) }
+                ) {
+                    if (!isCurrent) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text("Set as current")
+                                }
+                            },
+                            onClick = {
+                                onMenuExpandedChange(null)
+                                onSetCurrent()
+                            }
+                        )
+                    }
                     DropdownMenuItem(
-                        text = { Text("Set as current") },
+                        text = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text("Edit")
+                            }
+                        },
                         onClick = {
                             onMenuExpandedChange(null)
-                            onSetCurrent()
+                            onEdit()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Text("Delete", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        onClick = {
+                            onMenuExpandedChange(null)
+                            onDelete()
                         }
                     )
                 }
-                DropdownMenuItem(
-                    text = { Text("Edit") },
-                    onClick = {
-                        onMenuExpandedChange(null)
-                        onEdit()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    onClick = {
-                        onMenuExpandedChange(null)
-                        onDelete()
-                    }
-                )
             }
         }
     }
@@ -494,8 +728,8 @@ private fun PresetEditorDialog(
             }
             .sortedWith(
                 compareBy<InstalledApp>(
-                    { if (sortSelectedFirst) !(it.packageName in selectedPackages) else false }, // selected first if enabled
-                    { it.appName.lowercase() } // then A–Z by name
+                    { if (sortSelectedFirst) !(it.packageName in selectedPackages) else false },
+                    { it.appName.lowercase() }
                 )
             )
             .toList()
@@ -505,34 +739,32 @@ private fun PresetEditorDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (preset.name.isBlank()) "New preset" else "Edit preset",
-                style = TextStyle(
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
+                text = if (preset.name.isBlank()) "New Preset" else "Edit Preset",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold
                 )
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Preset name") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Orange,
+                        focusedLabelColor = Orange
+                    )
                 )
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Emoji",
-                        style = TextStyle(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        text = "Icon",
+                        style = MaterialTheme.typography.labelLarge
                     )
 
                     Row(
@@ -540,107 +772,92 @@ private fun PresetEditorDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         emojiOptions.forEach { option ->
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = if (emoji == option) Color(0x33FFFFFF) else Color.Transparent,
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable { emoji = option }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                contentAlignment = Alignment.Center
+                            val isSelected = emoji == option
+                            val scale by animateFloatAsState(
+                                targetValue = if (isSelected) 1.1f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessHigh
+                                ),
+                                label = "emojiScale"
+                            )
+
+                            Surface(
+                                modifier = Modifier.scale(scale),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) Orange.copy(alpha = 0.2f) else Color.Transparent,
+                                tonalElevation = if (isSelected) 4.dp else 0.dp
                             ) {
-                                Text(
-                                    text = option,
-                                    style = TextStyle(fontSize = 24.sp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clickable { emoji = option }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = option,
+                                        style = TextStyle(fontSize = 28.sp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
                 Text(
-                    text = "Blocked apps",
-                    style = TextStyle(
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    text = "Blocked Apps (${selectedPackages.size})",
+                    style = MaterialTheme.typography.labelLarge
                 )
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Search
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         label = { Text("Search apps") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search"
+                            )
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Orange,
+                            focusedLabelColor = Orange,
+                            focusedLeadingIconColor = Orange
+                        )
                     )
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            AppCategoryFilter.values().forEach { category ->
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            color = if (selectedCategory == category) Color(
-                                                0xFFFF4400
-                                            ) else Color(0x33FFFFFF),
-                                            shape = RoundedCornerShape(50)
-                                        )
-                                        .clickable { selectedCategory = category }
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = category.label,
-                                        style = TextStyle(fontSize = 12.sp, color = Color.White)
-                                    )
-                                }
-                            }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AppCategoryFilter.values().forEach { category ->
+                            val isSelected = selectedCategory == category
+                            FilterChip(
+                                label = category.label,
+                                isSelected = isSelected,
+                                onClick = { selectedCategory = category }
+                            )
                         }
+                    }
 
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = if (showOnlySelected) Color(0xFFFF4400) else Color(
-                                            0x33FFFFFF
-                                        ),
-                                        shape = RoundedCornerShape(50)
-                                    )
-                                    .clickable { showOnlySelected = !showOnlySelected }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (showOnlySelected) "Selected only" else "All apps",
-                                    style = TextStyle(fontSize = 12.sp, color = Color.White)
-                                )
-                            }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            label = if (showOnlySelected) "Selected only" else "All apps",
+                            isSelected = showOnlySelected,
+                            onClick = { showOnlySelected = !showOnlySelected }
+                        )
 
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = if (sortSelectedFirst) Color(0xFFFF4400) else Color(
-                                            0x33FFFFFF
-                                        ),
-                                        shape = RoundedCornerShape(50)
-                                    )
-                                    .clickable { sortSelectedFirst = !sortSelectedFirst }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (sortSelectedFirst) "Selected first" else "A–Z only",
-                                    style = TextStyle(fontSize = 12.sp, color = Color.White)
-                                )
-                            }
-                        }
+                        FilterChip(
+                            label = if (sortSelectedFirst) "Selected first" else "A–Z only",
+                            isSelected = sortSelectedFirst,
+                            onClick = { sortSelectedFirst = !sortSelectedFirst }
+                        )
                     }
                 }
 
@@ -657,7 +874,9 @@ private fun PresetEditorDialog(
                             ) {
                                 Text(
                                     text = "Loading apps...",
-                                    style = TextStyle(fontSize = 13.sp, color = Color.Gray)
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
                                 )
                             }
                         }
@@ -667,10 +886,23 @@ private fun PresetEditorDialog(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "No apps match your filters",
-                                    style = TextStyle(fontSize = 13.sp, color = Color.Gray)
-                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                    )
+                                    Text(
+                                        text = "No apps match your filters",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    )
+                                }
                             }
                         }
 
@@ -678,12 +910,29 @@ private fun PresetEditorDialog(
                             LazyColumn(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                items(filteredApps) { app ->
+                                itemsIndexed(filteredApps, key = { _, app -> app.packageName }) { index, app ->
                                     val isChecked = app.packageName in selectedPackages
+                                    val alpha by animateFloatAsState(
+                                        targetValue = 1f,
+                                        animationSpec = tween(
+                                            durationMillis = 300,
+                                            delayMillis = index * 20
+                                        ),
+                                        label = "appAlpha"
+                                    )
+
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
+                                            .alpha(alpha)
+                                            .clickable {
+                                                selectedPackages = if (isChecked) {
+                                                    selectedPackages - app.packageName
+                                                } else {
+                                                    selectedPackages + app.packageName
+                                                }
+                                            }
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         val iconBitmap = rememberAppIcon(app.icon)
@@ -691,8 +940,8 @@ private fun PresetEditorDialog(
                                             bitmap = iconBitmap,
                                             contentDescription = app.appName,
                                             modifier = Modifier
-                                                .height(32.dp)
-                                                .padding(end = 8.dp)
+                                                .size(40.dp)
+                                                .padding(end = 12.dp)
                                         )
 
                                         Column(
@@ -700,7 +949,9 @@ private fun PresetEditorDialog(
                                         ) {
                                             Text(
                                                 text = app.appName,
-                                                style = TextStyle(fontSize = 14.sp)
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = if (isChecked) FontWeight.SemiBold else FontWeight.Normal
+                                                )
                                             )
                                         }
 
@@ -712,7 +963,11 @@ private fun PresetEditorDialog(
                                                 } else {
                                                     selectedPackages - app.packageName
                                                 }
-                                            }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = Orange,
+                                                checkmarkColor = Color.White
+                                            )
                                         )
                                     }
                                 }
@@ -723,7 +978,7 @@ private fun PresetEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            FilledTonalButton(
                 onClick = {
                     onSave(
                         preset.copy(
@@ -733,7 +988,8 @@ private fun PresetEditorDialog(
                             emoji = emoji
                         )
                     )
-                }
+                },
+                enabled = name.isNotBlank()
             ) {
                 Text("Save")
             }
@@ -744,6 +1000,53 @@ private fun PresetEditorDialog(
             }
         }
     )
+}
+
+@Composable
+private fun FilterChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) Orange else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "chipBackground"
+    )
+
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "chipScale"
+    )
+
+    Surface(
+        modifier = Modifier.scale(scale),
+        shape = RoundedCornerShape(16.dp),
+        color = backgroundColor,
+        tonalElevation = if (isSelected) 4.dp else 0.dp,
+        shadowElevation = if (isSelected) 2.dp else 0.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .clickable { onClick() }
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                )
+            )
+        }
+    }
 }
 
 private enum class AppCategoryFilter(val label: String) {
@@ -769,4 +1072,3 @@ private fun InstalledApp.toCategoryFilter(): AppCategoryFilter {
         else -> AppCategoryFilter.Other
     }
 }
-

@@ -3,9 +3,21 @@ package ca.qolt.services
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import ca.qolt.data.repository.AppBlockingRepository
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
 class AppBlockingRestartReceiver : BroadcastReceiver() {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface AppBlockingRestartReceiverEntryPoint {
+        fun appBlockingRepository(): AppBlockingRepository
+    }
 
     companion object {
         private const val TAG = "AppBlockingRestart"
@@ -14,13 +26,21 @@ class AppBlockingRestartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Timber.tag(TAG).d("Received broadcast: ${intent.action}")
 
+        val appContext = context.applicationContext
+        val hiltEntryPoint = EntryPointAccessors.fromApplication(
+            appContext,
+            AppBlockingRestartReceiverEntryPoint::class.java
+        )
+        val repository = hiltEntryPoint.appBlockingRepository()
+
         // Check if blocking should be active
-        if (!AppBlockingManager.isBlockingActive(context)) {
+        val isActive = runBlocking { repository.isBlockingActive() }
+        if (!isActive) {
             Timber.tag(TAG).d("Blocking not active - ignoring broadcast")
             return
         }
 
-        val blockedApps = AppBlockingManager.getBlockedApps(context)
+        val blockedApps = runBlocking { repository.getBlockedApps() }
         if (blockedApps.isEmpty()) {
             Timber.tag(TAG).w("Blocking active but no apps configured")
             return
