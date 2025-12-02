@@ -13,13 +13,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.AlertDialog
@@ -113,18 +116,20 @@ fun PresetsScreen(
         }
     }
 
+    val scrollState = rememberScrollState()
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF1C1C1E))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
-        ) {
-            if (presets.isEmpty()) {
+        if (presets.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
+            ) {
                 Text(
                     text = "Blocks",
                     modifier = Modifier.fillMaxWidth(),
@@ -135,7 +140,64 @@ fun PresetsScreen(
                         fontWeight = FontWeight.Bold,
                     )
                 )
-            } else {
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        Text(
+                            text = "You don't have any blocks yet",
+                            style = TextStyle(
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    color = Color(0xFFFF4400),
+                                    shape = RoundedCornerShape(48.dp)
+                                )
+                                .clickable {
+                                    isCreatingNew = true
+                                    editingPreset = PresetEntity(
+                                        id = UUID.randomUUID().toString(),
+                                        name = "",
+                                        description = "",
+                                        blockedApps = emptyList()
+                                    )
+                                }
+                                .padding(horizontal = 8.dp, vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Create Your First Block",
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -197,101 +259,36 @@ fun PresetsScreen(
                         )
                     }
                 }
-            }
 
-            if (presets.isEmpty()){
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        Text(
-                            text = "You don't have any blocks yet",
-                            style = TextStyle(
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-
-                        Box(
-                            modifier = Modifier.fillMaxWidth()
-                                .background(
-                                    color = Color(0xFFFF4400),
-                                    shape = RoundedCornerShape(48.dp)
-                                )
-                                .clickable {
-                                    isCreatingNew = true
-                                    editingPreset = PresetEntity(
-                                        id = UUID.randomUUID().toString(),
-                                        name = "",
-                                        description = "",
-                                        blockedApps = emptyList()
-                                    )
-                                }
-                                .padding(horizontal = 8.dp, vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Create Your First Block",
-                                style = TextStyle(
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            )
-                        }
-                    }
-                }
-            } else {
-                LazyColumn(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top)
                 ) {
-                    if(currentPreset != null) {
-                        item{
-                            Text(
-                                text = "CURRENT",
-                                style = TextStyle(
-                                    color = Color(0xFFFDFDFD),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Light
-                                )
+                    if (currentPreset != null) {
+                        Text(
+                            text = "CURRENT",
+                            style = TextStyle(
+                                color = Color(0xFFFDFDFD),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Light
                             )
-                        }
-                        item {
-                            PresetRow(
-                                preset = currentPreset,
-                                isCurrent = true,
-                                menuExpandedForId = menuExpandedForId,
-                                onMenuExpandedChange = {menuExpandedForId = it},
-                                onSetCurrent = {setCurrentPresetId(currentPreset.id)},
-                                onEdit = {
-                                    isCreatingNew = false
-                                    editingPreset = currentPreset
-                                },
-                                onDelete = {onDeletePreset(currentPreset)}
-                            )
-                        }
+                        )
+                        PresetRow(
+                            preset = currentPreset,
+                            isCurrent = true,
+                            menuExpandedForId = menuExpandedForId,
+                            onMenuExpandedChange = { menuExpandedForId = it },
+                            onSetCurrent = { setCurrentPresetId(currentPreset.id) },
+                            onEdit = {
+                                isCreatingNew = false
+                                editingPreset = currentPreset
+                            },
+                            onDelete = { onDeletePreset(currentPreset) }
+                        )
 
-                        if(recentPresets.isNotEmpty()) {
-                            item {
-                                Text(
-                                    text = "RECENT",
-                                    style = TextStyle(
-                                        color = Color(0xFFFDFDFD),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Light
-                                    )
-                                )
-                            }
-                        }
-                    } else {
-                        item {
+                        Spacer(Modifier.height(8.dp))
+
+                        if (recentPresets.isNotEmpty()) {
                             Text(
                                 text = "RECENT",
                                 style = TextStyle(
@@ -301,11 +298,18 @@ fun PresetsScreen(
                                 )
                             )
                         }
+                    } else {
+                        Text(
+                            text = "RECENT",
+                            style = TextStyle(
+                                color = Color(0xFFFDFDFD),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Light
+                            )
+                        )
                     }
-                    items(
-                        items = recentPresets,
-                        key = { it.id }
-                    ) { preset ->
+
+                    recentPresets.forEach { preset ->
                         PresetRow(
                             preset = preset,
                             isCurrent = false,
@@ -321,26 +325,27 @@ fun PresetsScreen(
                     }
                 }
             }
+        }
 
-            val presetToEdit = editingPreset
-            if (presetToEdit != null) {
-                PresetEditorDialog(
-                    preset = presetToEdit,
-                    allApps = allApps,
-                    onDismiss = {
-                        editingPreset = null
-                        isCreatingNew = false
-                    },
-                    onSave = { updated ->
-                        onSavePreset(updated, isCreatingNew)
-                        editingPreset = null
-                        isCreatingNew = false
-                    }
-                )
-            }
+        val presetToEdit = editingPreset
+        if (presetToEdit != null) {
+            PresetEditorDialog(
+                preset = presetToEdit,
+                allApps = allApps,
+                onDismiss = {
+                    editingPreset = null
+                    isCreatingNew = false
+                },
+                onSave = { updated ->
+                    onSavePreset(updated, isCreatingNew)
+                    editingPreset = null
+                    isCreatingNew = false
+                }
+            )
         }
     }
 }
+
 
 @Composable
 private fun PresetRow(
@@ -414,7 +419,7 @@ private fun PresetRow(
                 expanded = menuExpandedForId == preset.id,
                 onDismissRequest = { onMenuExpandedChange(null) }
             ) {
-                if(!isCurrent) {
+                if (!isCurrent) {
                     DropdownMenuItem(
                         text = { Text("Set as current") },
                         onClick = {
@@ -469,14 +474,22 @@ private fun PresetEditorDialog(
     var selectedCategory by remember { mutableStateOf(AppCategoryFilter.All) }
     var sortSelectedFirst by remember { mutableStateOf(true) }
 
-    val filteredApps = remember(allApps, searchQuery, showOnlySelected, selectedCategory, sortSelectedFirst, selectedPackages) {
+    val filteredApps = remember(
+        allApps,
+        searchQuery,
+        showOnlySelected,
+        selectedCategory,
+        sortSelectedFirst,
+        selectedPackages
+    ) {
         allApps
             .asSequence()
             .filter { app ->
                 val matchesSearch = app.appName.contains(searchQuery, ignoreCase = true)
                 val matchesSelected = !showOnlySelected || app.packageName in selectedPackages
                 val appCategory = app.toCategoryFilter()
-                val matchesCategory = selectedCategory == AppCategoryFilter.All || appCategory == selectedCategory
+                val matchesCategory =
+                    selectedCategory == AppCategoryFilter.All || appCategory == selectedCategory
                 matchesSearch && matchesSelected && matchesCategory
             }
             .sortedWith(
@@ -574,7 +587,9 @@ private fun PresetEditorDialog(
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            color = if (selectedCategory == category) Color(0xFFFF4400) else Color(0x33FFFFFF),
+                                            color = if (selectedCategory == category) Color(
+                                                0xFFFF4400
+                                            ) else Color(0x33FFFFFF),
                                             shape = RoundedCornerShape(50)
                                         )
                                         .clickable { selectedCategory = category }
@@ -595,7 +610,9 @@ private fun PresetEditorDialog(
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        color = if (showOnlySelected) Color(0xFFFF4400) else Color(0x33FFFFFF),
+                                        color = if (showOnlySelected) Color(0xFFFF4400) else Color(
+                                            0x33FFFFFF
+                                        ),
                                         shape = RoundedCornerShape(50)
                                     )
                                     .clickable { showOnlySelected = !showOnlySelected }
@@ -610,7 +627,9 @@ private fun PresetEditorDialog(
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        color = if (sortSelectedFirst) Color(0xFFFF4400) else Color(0x33FFFFFF),
+                                        color = if (sortSelectedFirst) Color(0xFFFF4400) else Color(
+                                            0x33FFFFFF
+                                        ),
                                         shape = RoundedCornerShape(50)
                                     )
                                     .clickable { sortSelectedFirst = !sortSelectedFirst }
