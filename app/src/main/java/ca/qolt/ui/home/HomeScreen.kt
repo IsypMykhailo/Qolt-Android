@@ -122,6 +122,7 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import ca.qolt.util.PreferencesManager
 
 
 private fun loadInstalledApps(context: Context): List<InstalledApp> {
@@ -281,6 +282,9 @@ fun Home(
         .format(Date())
     var emergencyUsedToday by remember {
         mutableStateOf(lastEmergencyDate == currentDate)
+    }
+    var emergencyUnlockEnabled by remember {
+        mutableStateOf(PreferencesManager.getEmergencyUnlockEnabled(context))
     }
 
     val currentStreak by viewModel.currentStreak.collectAsState()
@@ -592,7 +596,9 @@ fun Home(
     )
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 150.dp)
     ) {
         Row(
             modifier = Modifier
@@ -639,7 +645,7 @@ fun Home(
                     tonalElevation = if (emergencyUsedToday) 0.dp else 2.dp,
                     modifier = Modifier
                         .rotate(emergencyRotation)
-                        .clickable(enabled = !emergencyUsedToday) @RequiresPermission(
+                        .clickable(enabled = !emergencyUsedToday && emergencyUnlockEnabled) @RequiresPermission(
                             Manifest.permission.VIBRATE
                         ) {
                             if (!emergencyUsedToday) {
