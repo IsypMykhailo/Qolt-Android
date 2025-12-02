@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             QoltTheme {
                 val context = LocalContext.current
-                val initialScreen = if (PreferencesManager.isLoggedIn(context)) "main" else "onboarding"
+                val initialScreen = "main"
                 var currentScreen by remember { mutableStateOf(initialScreen) }
 
                 Crossfade(targetState = currentScreen) { screen ->

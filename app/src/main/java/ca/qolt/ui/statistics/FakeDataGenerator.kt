@@ -37,12 +37,27 @@ object FakeDataGenerator {
     
     fun generateAppUsageWidget(): WidgetType.AppUsage {
         val apps = listOf(
-            AppUsageItem("Instagram", 2.5f, 0xFFE4405F, 35f),
-            AppUsageItem("Email", 1.8f, 0xFF2196F3, 25f),
-            AppUsageItem("Messages", 1.2f, 0xFF4CAF50, 17f),
+            // Instagram: purple (0xFF8B5CF6 or similar purple)
+            AppUsageItem("Instagram", 2.5f, 0xFF8B5CF6, 35f),
+            // Email: lighter, more saturated blue (0xFF42A5F5 or similar)
+            AppUsageItem("Email", 1.8f, 0xFF42A5F5, 25f),
+            // Messages: brighter green (0xFF66BB6A or similar)
+            AppUsageItem("Messages", 1.2f, 0xFF66BB6A, 17f),
+            // YouTube: red (0xFFFF0000 - same red for icon and bar)
             AppUsageItem("YouTube", 3.1f, 0xFFFF0000, 43f)
         )
         return WidgetType.AppUsage(apps = apps)
+    }
+    
+    fun generateFocusTimeTodayWidget(): WidgetType.FocusTimeToday {
+        // Weekly data matching the screenshot: Mon=4.5, Tue=6, Wed=5.8, Thu=7.2, Fri=6.5, Sat=3, Sun=5.5
+        val weeklyData = listOf(4.5f, 6.0f, 5.8f, 7.2f, 6.5f, 3.0f, 5.5f)
+        return WidgetType.FocusTimeToday(
+            todayHours = 6.5f,
+            vsAverage = 1.2f,
+            weeklyData = weeklyData,
+            dayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+        )
     }
     
     fun generateTotalHoursWidget(): WidgetType.TotalHours {
@@ -52,21 +67,13 @@ object FakeDataGenerator {
         )
     }
     
-    fun generateCircularProgressWidget(): WidgetType.CircularProgress {
-        return WidgetType.CircularProgress(
-            current = 28f,
-            total = 228f,
-            percentage = 12
-        )
-    }
-    
-    fun generateBarChartWidget(): WidgetType.BarChart {
-        val dataPoints = listOf(28f, 32f, 35f, 37f)
-        val labels = listOf("W1", "W2", "W3", "W4")
-        return WidgetType.BarChart(
-            dataPoints = dataPoints,
-            labels = labels,
-            period = "Last 4 weeks"
+    fun generateMonthlyOverviewWidget(): WidgetType.MonthlyOverview {
+        // Weekly data: W1=28, W2=31, W3=34, W4=37 (total = 130, but display shows 133)
+        val weeklyData = listOf(28f, 31f, 34f, 37f)
+        return WidgetType.MonthlyOverview(
+            totalHours = 133f,
+            weeklyData = weeklyData,
+            weekLabels = listOf("W1", "W2", "W3", "W4")
         )
     }
     
@@ -95,6 +102,8 @@ object FakeDataGenerator {
     
     fun getDefaultWidgetTypes(): List<WidgetType> {
         return listOf(
+            // Focus Time Today widget
+            generateFocusTimeTodayWidget(),
             // Focus Sessions widgets (matching screenshot)
             generateFocusSessionsWidget(
                 currentProgress = 5,
@@ -109,11 +118,7 @@ object FakeDataGenerator {
                 subtitle = "Last 7 Days",
                 period = "last 7 days",
                 completedDays = listOf(true, true, false, true, false, false, true)
-            ),
-            // Stats Today widgets
-            generateStatsTodayWidget(),
-            WidgetType.StatsToday(value = 22.8f, unit = "hours"),
-            WidgetType.StatsToday(value = 22.28f, unit = "hours")
+            )
         )
     }
     
@@ -145,22 +150,9 @@ object FakeDataGenerator {
                     todayHours = if (filters.duration == Duration.ONE_DAY) widgetType.totalHours * multiplier else widgetType.todayHours
                 )
             }
-            is WidgetType.BarChart -> {
-                val dataPoints = when (filters.duration) {
-                    Duration.ONE_DAY -> listOf(widgetType.dataPoints.lastOrNull() ?: 0f)
-                    Duration.SEVEN_DAYS -> widgetType.dataPoints.take(7)
-                    Duration.THIRTY_DAYS -> widgetType.dataPoints + listOf(35f, 36f, 38f, 40f, 39f, 41f)
-                }
-                val labels = when (filters.duration) {
-                    Duration.ONE_DAY -> listOf("Today")
-                    Duration.SEVEN_DAYS -> listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                    Duration.THIRTY_DAYS -> (1..30).map { "Day $it" }
-                }
-                widgetType.copy(
-                    dataPoints = dataPoints,
-                    labels = labels,
-                    period = filters.getDescription()
-                )
+            is WidgetType.MonthlyOverview -> {
+                // Monthly overview doesn't change with filters for now
+                widgetType
             }
             is WidgetType.StatsToday -> {
                 val multiplier = when (filters.duration) {
@@ -169,18 +161,6 @@ object FakeDataGenerator {
                     Duration.THIRTY_DAYS -> 0.1f
                 }
                 widgetType.copy(value = widgetType.value * multiplier)
-            }
-            is WidgetType.CircularProgress -> {
-                val adjustedCurrent = when (filters.duration) {
-                    Duration.ONE_DAY -> widgetType.current * 0.15f
-                    Duration.SEVEN_DAYS -> widgetType.current
-                    Duration.THIRTY_DAYS -> widgetType.current * 4.3f
-                }
-                val percentage = ((adjustedCurrent / widgetType.total) * 100).toInt().coerceIn(0, 100)
-                widgetType.copy(
-                    current = adjustedCurrent,
-                    percentage = percentage
-                )
             }
             is WidgetType.FocusSessions -> {
                 // Focus sessions don't change with filters for now
