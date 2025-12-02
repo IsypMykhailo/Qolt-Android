@@ -205,13 +205,4 @@ Key build features:
 
 ## License
 
-[Add your license here]
-
-## Team
-
-[Add team members here]
-
-## Acknowledgments
-
-- Built with Android Jetpack libraries
-- Uses Material Design 3 components
+MIT License
