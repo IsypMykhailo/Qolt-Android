@@ -1,58 +1,54 @@
 package ca.qolt.data.local
 
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SessionManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val prefs: DataStore<Preferences>
 ) {
-    private val prefs = context.getSharedPreferences("session_prefs", Context.MODE_PRIVATE)
-
     companion object {
-        private const val KEY_CURRENT_SESSION_ID = "current_session_id"
-        private const val KEY_LAST_SERVICE_CHECK = "last_service_check"
+        private val KEY_CURRENT_SESSION_ID = longPreferencesKey("current_session_id")
+        private val KEY_LAST_SERVICE_CHECK = longPreferencesKey("last_service_check")
     }
 
     /**
      * Save the ID of the currently active session.
      */
-    fun saveCurrentSessionId(sessionId: Long) {
-        prefs.edit().putLong(KEY_CURRENT_SESSION_ID, sessionId).apply()
-    }
+    suspend fun saveCurrentSessionId(sessionId: Long) =
+        prefs.edit { it[KEY_CURRENT_SESSION_ID] = sessionId }
+
 
     /**
      * Get the ID of the currently active session.
      * @return Session ID or null if no active session
      */
-    fun getCurrentSessionId(): Long? {
-        val id = prefs.getLong(KEY_CURRENT_SESSION_ID, -1L)
-        return if (id == -1L) null else id
-    }
+    suspend fun getCurrentSessionId(): Long? = prefs.data.map { it[KEY_CURRENT_SESSION_ID] }.firstOrNull()
 
     /**
      * Clear the current session ID.
      */
-    fun clearCurrentSessionId() {
-        prefs.edit().remove(KEY_CURRENT_SESSION_ID).apply()
-    }
+    suspend fun clearCurrentSessionId() =
+        prefs.edit{it.remove(KEY_CURRENT_SESSION_ID)}
+
 
     /**
      * Save the timestamp of the last service health check.
      * This is used to estimate session duration if service is killed.
      */
-    fun saveLastServiceCheckTime(timestampMs: Long) {
-        prefs.edit().putLong(KEY_LAST_SERVICE_CHECK, timestampMs).apply()
-    }
+    suspend fun saveLastServiceCheckTime(timestampMs: Long) =
+        prefs.edit{it[KEY_LAST_SERVICE_CHECK] = timestampMs}
+
 
     /**
      * Get the timestamp of the last service health check.
      * @return Timestamp or null if never checked
      */
-    fun getLastServiceCheckTime(): Long? {
-        val time = prefs.getLong(KEY_LAST_SERVICE_CHECK, -1L)
-        return if (time == -1L) null else time
-    }
+    suspend fun getLastServiceCheckTime(): Long? = prefs.data.map{it[KEY_LAST_SERVICE_CHECK]}.firstOrNull()
 }

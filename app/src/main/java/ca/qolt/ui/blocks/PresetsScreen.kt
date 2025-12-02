@@ -75,12 +75,15 @@ private fun rememberAppIcon(drawable: Drawable): ImageBitmap {
 fun Presets(modifier: Modifier = Modifier, viewModel: PresetsViewModel) {
     val allApps by viewModel.allApps.collectAsState()
     val presets by viewModel.presets.collectAsState()
+    val currentPresetId by viewModel.currentPresetId.collectAsState()
     PresetsScreen(
         modifier = modifier,
         allApps = allApps,
         presets = presets,
+        currentPresetId = currentPresetId,
         onSavePreset = viewModel::savePreset,
-        onDeletePreset = viewModel::deletePreset
+        onDeletePreset = viewModel::deletePreset,
+        setCurrentPresetId = viewModel::setCurrentPresetId
     )
 }
 
@@ -89,13 +92,26 @@ fun PresetsScreen(
     modifier: Modifier = Modifier,
     allApps: List<InstalledApp>,
     presets: List<PresetEntity>,
+    currentPresetId: String?,
     onSavePreset: (PresetEntity, Boolean) -> Unit,
     onDeletePreset: (PresetEntity) -> Unit,
+    setCurrentPresetId: (String) -> Unit
 ) {
     var editingPreset by remember { mutableStateOf<PresetEntity?>(null) }
     var isCreatingNew by remember { mutableStateOf(false) }
 
     var menuExpandedForId by remember { mutableStateOf<String?>(null) }
+
+    val currentPreset = remember(presets, currentPresetId) {
+        presets.firstOrNull { it.id == currentPresetId }
+    }
+    val recentPresets = remember(presets, currentPreset) {
+        if (currentPreset != null) {
+            presets.filterNot { it.id == currentPreset.id }
+        } else {
+            presets
+        }
+    }
 
     Box(
         modifier = modifier
@@ -236,91 +252,72 @@ fun PresetsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top)
                 ) {
-                    items(
-                        items = presets,
-                        key = { it.id }
-                    ) { preset ->
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Color(0xFFFF4400),
-                                    RoundedCornerShape(48.dp)
-                                )
-                                .clickable {
-                                    menuExpandedForId = preset.id
-                                }
-                                .padding(vertical = 16.dp, horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    if(currentPreset != null) {
+                        item{
                             Text(
-                                text = preset.emoji,
+                                text = "CURRENT",
                                 style = TextStyle(
-                                    fontSize = 22.sp
+                                    color = Color(0xFFFDFDFD),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Light
                                 )
                             )
+                        }
+                        item {
+                            PresetRow(
+                                preset = currentPreset,
+                                isCurrent = true,
+                                menuExpandedForId = menuExpandedForId,
+                                onMenuExpandedChange = {menuExpandedForId = it},
+                                onSetCurrent = {setCurrentPresetId(currentPreset.id)},
+                                onEdit = {
+                                    isCreatingNew = false
+                                    editingPreset = currentPreset
+                                },
+                                onDelete = {onDeletePreset(currentPreset)}
+                            )
+                        }
 
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
+                        if(recentPresets.isNotEmpty()) {
+                            item {
                                 Text(
-                                    text = preset.name.ifBlank { "Untitled preset" },
+                                    text = "RECENT",
                                     style = TextStyle(
-                                        color = Color.White,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        color = Color(0xFFFDFDFD),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Light
                                     )
                                 )
-                                if (preset.description.isNotBlank()) {
-                                    Text(
-                                        text = preset.description,
-                                        style = TextStyle(
-                                            color = Color(0xFFFFEDE3),
-                                            fontSize = 13.sp
-                                        )
-                                    )
-                                }
-                            }
-
-                            Box {
-                                IconButton(
-                                    onClick = {
-                                        menuExpandedForId = preset.id
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.MoreHoriz,
-                                        contentDescription = "Preset options",
-                                        tint = Color.White
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = menuExpandedForId == preset.id,
-                                    onDismissRequest = { menuExpandedForId = null }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Edit") },
-                                        onClick = {
-                                            menuExpandedForId = null
-                                            isCreatingNew = false
-                                            editingPreset = preset
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Delete") },
-                                        onClick = {
-                                            menuExpandedForId = null
-                                            onDeletePreset(preset)
-                                        }
-                                    )
-                                }
                             }
                         }
+                    } else {
+                        item {
+                            Text(
+                                text = "RECENT",
+                                style = TextStyle(
+                                    color = Color(0xFFFDFDFD),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Light
+                                )
+                            )
+                        }
+                    }
+                    items(
+                        items = recentPresets,
+                        key = { it.id }
+                    ) { preset ->
+                        PresetRow(
+                            preset = preset,
+                            isCurrent = false,
+                            menuExpandedForId = menuExpandedForId,
+                            onMenuExpandedChange = { menuExpandedForId = it },
+                            onSetCurrent = { setCurrentPresetId(preset.id) },
+                            onEdit = {
+                                isCreatingNew = false
+                                editingPreset = preset
+                            },
+                            onDelete = { onDeletePreset(preset) }
+                        )
                     }
                 }
             }
@@ -338,6 +335,106 @@ fun PresetsScreen(
                         onSavePreset(updated, isCreatingNew)
                         editingPreset = null
                         isCreatingNew = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PresetRow(
+    preset: PresetEntity,
+    isCurrent: Boolean,
+    menuExpandedForId: String?,
+    onMenuExpandedChange: (String?) -> Unit,
+    onSetCurrent: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = Color(0xFFFF4400),
+                shape = RoundedCornerShape(48.dp)
+            )
+            .clickable {
+                onMenuExpandedChange(preset.id)
+            }
+            .padding(vertical = 16.dp, horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = preset.emoji,
+            style = TextStyle(
+                fontSize = 22.sp
+            )
+        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = preset.name.ifBlank { "Untitled preset" },
+                style = TextStyle(
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+            if (preset.description.isNotBlank()) {
+                Text(
+                    text = preset.description,
+                    style = TextStyle(
+                        color = Color(0xFFFFEDE3),
+                        fontSize = 13.sp
+                    )
+                )
+            }
+        }
+
+        Box {
+            IconButton(
+                onClick = {
+                    onMenuExpandedChange(preset.id)
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreHoriz,
+                    contentDescription = "Preset options",
+                    tint = Color.White
+                )
+            }
+
+            DropdownMenu(
+                expanded = menuExpandedForId == preset.id,
+                onDismissRequest = { onMenuExpandedChange(null) }
+            ) {
+                if(!isCurrent) {
+                    DropdownMenuItem(
+                        text = { Text("Set as current") },
+                        onClick = {
+                            onMenuExpandedChange(null)
+                            onSetCurrent()
+                        }
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    onClick = {
+                        onMenuExpandedChange(null)
+                        onEdit()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        onMenuExpandedChange(null)
+                        onDelete()
                     }
                 )
             }

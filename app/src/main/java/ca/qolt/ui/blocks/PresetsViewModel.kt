@@ -33,6 +33,9 @@ class PresetsViewModel @Inject constructor(
     private val _presets = MutableStateFlow<List<PresetEntity>>(emptyList())
     val presets: StateFlow<List<PresetEntity>> = _presets.asStateFlow()
 
+    private val _currentPresetId = MutableStateFlow<String?>(null)
+    val currentPresetId: StateFlow<String?> = _currentPresetId.asStateFlow()
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val apps = loadInstalledApps(context)
@@ -43,6 +46,11 @@ class PresetsViewModel @Inject constructor(
             presetRepository.getAllPresets().collect { presetsList ->
                 _presets.value = presetsList
             }
+        }
+
+        viewModelScope.launch {
+            val presetId = presetRepository.getCurrentPresetId()
+            _currentPresetId.value = presetId
         }
     }
 
@@ -59,6 +67,13 @@ class PresetsViewModel @Inject constructor(
     fun deletePreset(preset: PresetEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             presetRepository.deletePreset(preset)
+        }
+    }
+
+    fun setCurrentPresetId(presetId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            presetRepository.setCurrentPresetId(presetId)
+            _currentPresetId.value = presetId
         }
     }
 
